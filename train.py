@@ -233,7 +233,8 @@ def make_optimizer(model: nn.Module) -> torch.optim.Optimizer:
     )
 
 
-def run_epoch(model, optimizer, images, labels, mean, std, batch_size: int):
+def run_epoch(model, optimizer, images, labels, mean, std, batch_size: int, bf16: bool = True):
+    """Satu epoch SGD. bf16=False menghitung dengan float32 (CPU tanpa bfloat16)."""
     model.train()
     order = torch.randperm(images.shape[0])
     total_loss = 0.0
@@ -248,7 +249,7 @@ def run_epoch(model, optimizer, images, labels, mean, std, batch_size: int):
         batch = batch.contiguous(memory_format=torch.channels_last)
         target = labels[index]
         optimizer.zero_grad(set_to_none=True)
-        with torch.autocast(device_type="cpu", dtype=torch.bfloat16):
+        with torch.autocast(device_type="cpu", dtype=torch.bfloat16, enabled=bf16):
             logits = model(batch)
         loss = criterion(logits.float(), target)
         loss.backward()
