@@ -1,8 +1,8 @@
 """Skor model CIFAR-10 yang sudah dibekukan pada 10.000 gambar uji resmi.
 
-Himpunan uji tidak dipakai untuk melatih atau memilih checkpoint. Skrip ini hanya
-mengukur ulang berkas model. Angka yang dicetak harus sama dengan
-results/metrics.json.
+Himpunan uji tidak dipakai untuk melatih atau memilih model. Skrip ini hanya
+mengukur ulang berkas model dengan tampilan yang sama seperti aplikasi
+(classify.TTA_POLICY). Angka yang dicetak harus sama dengan results/metrics.json.
 
 Butuh dependensi aplikasi (TensorFlow), bukan PyTorch:
 
@@ -16,6 +16,7 @@ import hashlib
 import json
 import os
 import pickle
+import sys
 import tarfile
 import urllib.request
 from pathlib import Path
@@ -26,50 +27,34 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
-CIFAR_URL = "https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz"
-CLASS_NAMES = (
-    "Airplane",
-    "Automobile",
-    "Bird",
-    "Cat",
-    "Deer",
-    "Dog",
-    "Frog",
-    "Horse",
-    "Ship",
-    "Truck",
-)
+sys.path.insert(0, str(ROOT))
 
-# Fakta pelatihan yang tidak bisa dibaca dari berkas .h5. Checkpoint dipilih
-# dari validasi sebelum evaluasi uji yang pertama, pada 8 November 2026.
-TRAINING_RECORD = {
-    "dataset": "CIFAR-10",
+from classify import CLASS_NAMES, TTA_POLICIES, TTA_POLICY, model_path, tta_views
+
+CIFAR_URL = "https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz"
+# Tampilan yang dilaporkan: satu gambar, cermin, dan kebijakan aplikasi.
+REPORTED_POLICIES = tuple(dict.fromkeys(("single", "flip", TTA_POLICY)))
+
+# Fakta pelatihan model dasar v5 yang tidak bisa dibaca dari berkas .h5.
+# Model yang dipakai aplikasi adalah lanjutan SWA dari v5; faktanya ada di
+# results/swa_metrics.json, yang ditulis scripts/finetune_swa.py.
+BASE_TRAINING_RECORD = {
+    "model_file": "model_cnn_cifar10_v5.h5",
+    "model_sha256": "539a2abe2e9145eeaff34e21a295d77bf12c4db5f0967143db98467b08d52b71",
     "train_images": 45000,
     "validation_images": 5000,
     "validation_per_class": 500,
-    "test_images": 10000,
     "seed": 42,
-    "epochs_scheduled": 200,
     "epochs_completed": 200,
     "best_checkpoint_epoch": 196,
     "checkpoint_metric": "validation_accuracy_horizontal_flip_tta",
     "validation_accuracy_single_view": 0.9624,
     "validation_accuracy_flip_tta": 0.9648,
-    "test_set_used_for_training": False,
-    "test_set_used_for_checkpoint_selection": False,
-    "training_test_evaluations": 1,
+    "test_correct_single_view": 9571,
+    "test_correct_flip_tta": 9606,
     "training_time_seconds": 23566.9,
     "date": "2026-11-08",
-    "hardware": {
-        "gpu": False,
-        "cpu_cores": 4,
-        "cpu_model": "Intel(R) Xeon(R) Processor",
-        "training_compute": "bfloat16",
-        "exported_weights": "float32",
-    },
     "framework_train": "PyTorch 2.15.0+cpu",
-    "framework_export": "TensorFlow 2.21.0 / Keras 3.15.1",
-    "app_inference": "horizontal_flip_tta",
 }
 
 
@@ -108,18 +93,21 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def predict(model, images_uint8: np.ndarray, batch_size: int) -> tuple[np.ndarray, np.ndarray]:
-    single = np.empty(len(images_uint8), dtype=np.int64)
-    tta = np.empty(len(images_uint8), dtype=np.int64)
-    for start in range(0, len(images_uint8), batch_size):
-        batch = images_uint8[start : start + batch_size].astype(np.float32) / 255.0
-        flipped = np.ascontiguousarray(batch[:, :, ::-1, :])
-        probs = np.asarray(model(batch, training=False), dtype=np.float64)
-        probs_flip = np.asarray(model(flipped, training=False), dtype=np.float64)
-        stop = start + len(batch)
-        single[start:stop] = probs.argmax(axis=1)
-        tta[start:stop] = ((probs + probs_flip) * 0.5).argmax(axis=1)
-    return single, tta
+def predict(model, images_uint8: np.ndarray, batch_size: int) -> dict[str, np.ndarray]:
+    """Kelas tebakan per kebijakan tampilan, lewat classify.tta_views seperti aplikasi."""
+    predicted = {}
+    for policy in REPORTED_POLICIES:
+        views = len(TTA_POLICIES[policy])
+        # batch_size membatasi jumlah tampilan per panggilan model, bukan jumlah gambar.
+        step = max(1, batch_size // views)
+        classes = np.empty(len(images_uint8), dtype=np.int64)
+        for start in range(0, len(images_uint8), step):
+            batch = images_uint8[start : start + step].astype(np.float32) / 255.0
+            probs = np.asarray(model(tta_views(batch, policy), training=False), dtype=np.float64)
+            averaged = probs.reshape(views, len(batch), -1).mean(axis=0)
+            classes[start : start + len(batch)] = averaged.argmax(axis=1)
+        predicted[policy] = classes
+    return predicted
 
 
 def confusion(labels: np.ndarray, predicted: np.ndarray) -> list[list[int]]:
@@ -145,7 +133,7 @@ def save_confusion_png(matrix: list[list[int]], path: Path) -> None:
     image = Image.new("RGB", (width, height), "white")
     draw = ImageDraw.Draw(image)
     font = ImageFont.load_default()
-    draw.text((16, 16), "CIFAR-10 test confusion matrix, horizontal-flip TTA", fill="black", font=font)
+    draw.text((16, 16), f"CIFAR-10 test confusion matrix, app views ({TTA_POLICY})", fill="black", font=font)
     draw.text((16, 36), "rows = true class, columns = predicted class, counts out of 1000", fill="black", font=font)
     peak = max(max(row) for row in matrix)
     short = list(CLASS_NAMES)
@@ -166,66 +154,69 @@ def save_confusion_png(matrix: list[list[int]], path: Path) -> None:
     image.save(path)
 
 
-def accuracy(labels: np.ndarray, predicted: np.ndarray) -> float:
-    return float((labels == predicted).mean())
-
-
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", default=str(ROOT / "model_cnn_cifar10_v5.h5"))
+    parser.add_argument("--model", default=str(model_path()))
     parser.add_argument("--data-dir", default=str(ROOT / "data"))
     parser.add_argument("--batch-size", type=int, default=256)
     parser.add_argument("--write-results", action="store_true")
     args = parser.parse_args()
 
-    model_path = Path(args.model)
+    path = Path(args.model)
     from tensorflow.keras.models import load_model
 
-    model = load_model(model_path, compile=False)
+    model = load_model(path, compile=False)
     images, labels = load_test(Path(args.data_dir))
-    single, tta = predict(model, images, args.batch_size)
-    matrix_single = confusion(labels, single)
-    matrix_tta = confusion(labels, tta)
-    single_acc = accuracy(labels, single)
-    tta_acc = accuracy(labels, tta)
-    single_correct = int((labels == single).sum())
-    tta_correct = int((labels == tta).sum())
-    digest = sha256(model_path)
+    predicted = predict(model, images, args.batch_size)
+    correct = {policy: int((labels == value).sum()) for policy, value in predicted.items()}
+    matrices = {policy: confusion(labels, value) for policy, value in predicted.items()}
+    digest = sha256(path)
 
-    print(f"model: {model_path.name}")
+    print(f"model: {path.name}")
     print(f"sha256: {digest}")
-    print(f"test single-view: {single_correct}/10000 = {single_acc:.4f}")
-    print(f"test flip-TTA: {tta_correct}/10000 = {tta_acc:.4f}")
-    print("per class single-view / flip-TTA:")
-    single_class = per_class(matrix_single)
-    tta_class = per_class(matrix_tta)
+    for policy in REPORTED_POLICIES:
+        marker = " (aplikasi)" if policy == TTA_POLICY else ""
+        print(f"test {policy}{marker}: {correct[policy]}/10000 = {correct[policy] / 10000:.4f}")
+    print(f"per class single / {TTA_POLICY}:")
+    single_class = per_class(matrices["single"])
+    app_class = per_class(matrices[TTA_POLICY])
     for name in CLASS_NAMES:
-        print(f"  {name}: {single_class[name]:.4f} / {tta_class[name]:.4f}")
+        print(f"  {name}: {single_class[name]:.4f} / {app_class[name]:.4f}")
 
     if not args.write_results:
         return
 
     results = ROOT / "results"
     results.mkdir(parents=True, exist_ok=True)
+    finetune = {}
+    swa_path = results / "swa_metrics.json"
+    if swa_path.is_file():
+        finetune = json.loads(swa_path.read_text(encoding="utf-8"))
+        finetune.pop("history", None)
     payload = {
-        **TRAINING_RECORD,
-        "model_file": model_path.name,
+        "dataset": "CIFAR-10",
+        "test_images": 10000,
+        "model_file": path.name,
         "model_sha256": digest,
-        "model_bytes": model_path.stat().st_size,
-        "test_correct_single_view": single_correct,
-        "test_correct_flip_tta": tta_correct,
-        "test_accuracy_single_view": single_acc,
-        "test_accuracy_flip_tta": tta_acc,
-        "per_class_test_accuracy_single_view": single_class,
-        "per_class_test_accuracy_flip_tta": tta_class,
-        "confusion_matrix_single_view": matrix_single,
-        "confusion_matrix_flip_tta": matrix_tta,
+        "model_bytes": path.stat().st_size,
+        "app_inference": TTA_POLICY,
+        "app_views": len(TTA_POLICIES[TTA_POLICY]),
+        "test_set_used_for_training": False,
+        "test_set_used_for_selection": False,
+        "test_correct": correct,
+        "test_accuracy": {policy: count / 10000 for policy, count in correct.items()},
+        "per_class_test_accuracy_single": single_class,
+        "per_class_test_accuracy_app": app_class,
+        "confusion_matrix_single": matrices["single"],
+        "confusion_matrix_app": matrices[TTA_POLICY],
         "confusion_matrix_png": "results/confusion_matrix_tta.png",
+        "fine_tune": finetune,
+        "base_training": BASE_TRAINING_RECORD,
     }
     metrics_path = results / "metrics.json"
     metrics_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-    (results / "model_sha256.txt").write_text(f"{digest}  {model_path.name}\n", encoding="utf-8")
-    save_confusion_png(matrix_tta, results / "confusion_matrix_tta.png")
+    (results / "model_sha256.txt").write_text(f"{digest}  {path.name}\n", encoding="utf-8")
+    save_confusion_png(matrices[TTA_POLICY], results / "confusion_matrix_tta.png")
     print(f"wrote {metrics_path}")
     print(f"wrote {results / 'model_sha256.txt'}")
     print(f"wrote {results / 'confusion_matrix_tta.png'}")

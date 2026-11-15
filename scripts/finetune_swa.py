@@ -9,8 +9,10 @@ Pembagian data sama dengan train.py: 45.000 gambar latih dan 5.000 validasi
 (seed 42). Model yang dipakai dan kebijakan tampilan (TTA) dipilih dari akurasi
 validasi. Himpunan uji baru dibaca setelah pilihan itu dibekukan.
 
-Jalankan dari akar repositori:
+Model dasar v5 tidak lagi ada di pohon kerja (aplikasi memakai hasil skrip ini).
+Ambil dari riwayat git, lalu jalankan dari akar repositori:
 
+    git show 72895f7:model_cnn_cifar10_v5.h5 > model_cnn_cifar10_v5.h5
     python scripts/finetune_swa.py --time-budget-minutes 270
 """
 from __future__ import annotations

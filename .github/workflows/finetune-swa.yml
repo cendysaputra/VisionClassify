@@ -1,16 +1,11 @@
 name: Fine-tune model (SWA)
 
 # Melanjutkan pelatihan model CIFAR-10 dengan rata-rata bobot (SWA), memilih
-# model dan tampilan dari validasi, lalu meng-commit hasilnya ke branch ini.
-# Tidak jalan di main: model baru masuk lewat pull request.
+# model dan tampilan dari validasi, lalu meng-commit hasilnya ke branch tempat
+# workflow dijalankan. Hanya manual (sekitar 5 jam); jalankan dari branch selain
+# main supaya model baru masuk lewat pull request.
 on:
   workflow_dispatch:
-  push:
-    branches-ignore:
-      - main
-    paths:
-      - scripts/finetune_swa.py
-      - .github/workflows/finetune-swa.yml
 
 permissions:
   contents: write
@@ -25,6 +20,11 @@ jobs:
     timeout-minutes: 355
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Restore the v5 base model from history
+        run: git show 72895f7:model_cnn_cifar10_v5.h5 > model_cnn_cifar10_v5.h5
 
       - uses: actions/setup-python@v5
         with:
