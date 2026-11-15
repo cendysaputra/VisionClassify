@@ -11,12 +11,12 @@ from classify import (
     CLASS_NAMES,
     ImageLoadError,
     average_probabilities,
-    horizontal_flip,
     load_image,
     model_path,
     preprocess,
     preview_image,
     summarize_prediction,
+    tta_views,
 )
 
 MODE_CIFAR = "CIFAR-10"
@@ -51,8 +51,7 @@ def probability_bar_html(label: str, probability: float) -> str:
 
 def predict(model, image: Image.Image):
     batch = preprocess(image)
-    views = np.concatenate([batch, horizontal_flip(batch)], axis=0)
-    raw = np.asarray(model(views, training=False))
+    raw = np.asarray(model(tta_views(batch), training=False))
     return summarize_prediction(average_probabilities(raw))
 
 
