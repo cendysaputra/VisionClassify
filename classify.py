@@ -25,7 +25,7 @@ CLASS_NAMES: tuple[str, ...] = (
     "Truck",
 )
 
-MODEL_FILENAME = "model_cnn_cifar10_v5.h5"
+MODEL_FILENAME = "model_cnn_cifar10_v6.h5"
 MODEL_INPUT_SIZE = 32
 PREVIEW_MAX_SIDE = 512
 # Batasi decode agar file kecil tidak berkembang menjadi gambar raksasa.
@@ -43,8 +43,9 @@ TTA_POLICIES: dict[str, tuple[tuple[int, int, bool], ...]] = {
     "flip_shift1": tuple((dy, dx, flip) for flip in (False, True) for dy, dx in _CROSS_1),
     "flip_shift2": tuple((dy, dx, flip) for flip in (False, True) for dy, dx in _CROSS_2),
 }
-# Kebijakan yang dipakai aplikasi. Dipilih dari akurasi validasi, bukan uji.
-TTA_POLICY = "flip"
+# Kebijakan yang dipakai aplikasi. Dipilih dari akurasi validasi, bukan uji
+# (results/swa_metrics.json).
+TTA_POLICY = "flip_shift1"
 
 _UNREADABLE = "Gambar tidak dapat dibaca. Gunakan file JPG, PNG, atau WEBP yang valid."
 
