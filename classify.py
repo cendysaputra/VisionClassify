@@ -25,12 +25,27 @@ CLASS_NAMES: tuple[str, ...] = (
     "Truck",
 )
 
-MODEL_FILENAME = "model_cnn_cifar10_v5.h5"
+MODEL_FILENAME = "model_cnn_cifar10_v6.h5"
 MODEL_INPUT_SIZE = 32
 PREVIEW_MAX_SIDE = 512
 # Batasi decode agar file kecil tidak berkembang menjadi gambar raksasa.
 MAX_IMAGE_PIXELS = 40_000_000
 LOW_CONFIDENCE_THRESHOLD = 0.5
+
+# Tampilan yang dirata-ratakan saat prediksi: (geser_y, geser_x, cermin).
+# Geseran memakai piksel; tepi yang kosong diisi hitam, sama dengan pad + crop
+# saat pelatihan.
+_CROSS_1 = ((0, 0), (-1, 0), (1, 0), (0, -1), (0, 1))
+_CROSS_2 = ((0, 0), (-2, 0), (2, 0), (0, -2), (0, 2))
+TTA_POLICIES: dict[str, tuple[tuple[int, int, bool], ...]] = {
+    "single": ((0, 0, False),),
+    "flip": ((0, 0, False), (0, 0, True)),
+    "flip_shift1": tuple((dy, dx, flip) for flip in (False, True) for dy, dx in _CROSS_1),
+    "flip_shift2": tuple((dy, dx, flip) for flip in (False, True) for dy, dx in _CROSS_2),
+}
+# Kebijakan yang dipakai aplikasi. Dipilih dari akurasi validasi, bukan uji
+# (results/swa_metrics.json).
+TTA_POLICY = "flip_shift1"
 
 _UNREADABLE = "Gambar tidak dapat dibaca. Gunakan file JPG, PNG, atau WEBP yang valid."
 
@@ -117,6 +132,36 @@ def horizontal_flip(batch: np.ndarray) -> np.ndarray:
     if array.ndim != 4:
         raise ValueError("Batch cermin harus berbentuk (N, tinggi, lebar, kanal).")
     return np.ascontiguousarray(np.flip(array, axis=2))
+
+
+def shift(batch: np.ndarray, dy: int, dx: int) -> np.ndarray:
+    """Geser batch NHWC sejauh (dy, dx) piksel; tepi yang terbuka diisi nol."""
+    array = np.asarray(batch)
+    if array.ndim != 4:
+        raise ValueError("Batch geser harus berbentuk (N, tinggi, lebar, kanal).")
+    height, width = array.shape[1:3]
+    if abs(dy) >= height or abs(dx) >= width:
+        raise ValueError("Geseran melebihi ukuran gambar.")
+    out = np.zeros_like(array)
+    out[:, max(dy, 0) : height + min(dy, 0), max(dx, 0) : width + min(dx, 0)] = array[
+        :, max(-dy, 0) : height + min(-dy, 0), max(-dx, 0) : width + min(-dx, 0)
+    ]
+    return out
+
+
+def tta_views(batch: np.ndarray, policy: str = TTA_POLICY) -> np.ndarray:
+    """Semua tampilan `policy` untuk batch NHWC, disusun per tampilan.
+
+    Hasilnya (tampilan * N, tinggi, lebar, kanal): N baris pertama adalah
+    tampilan pertama dari setiap gambar, dan seterusnya.
+    """
+    if policy not in TTA_POLICIES:
+        raise ValueError(f"Kebijakan TTA tidak dikenal: {policy!r}")
+    views = []
+    for dy, dx, flip in TTA_POLICIES[policy]:
+        view = shift(batch, dy, dx) if (dy or dx) else np.asarray(batch)
+        views.append(horizontal_flip(view) if flip else view)
+    return np.concatenate(views, axis=0)
 
 
 def average_probabilities(views: np.ndarray) -> np.ndarray:
