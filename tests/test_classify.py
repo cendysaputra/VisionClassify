@@ -13,6 +13,10 @@ from classify import (
     average_probabilities,
     class_probabilities,
     horizontal_flip,
+    shift,
+    tta_views,
+    TTA_POLICIES,
+    TTA_POLICY,
     load_image,
     model_path,
     preprocess,
@@ -193,3 +197,37 @@ def test_class_probabilities_reject_bad_shapes_and_values():
         class_probabilities(np.zeros((2, 10)))
     with pytest.raises(ValueError):
         class_probabilities(np.full(10, np.nan))
+
+
+def test_shift_moves_pixels_and_fills_the_gap_with_zero():
+    batch = np.arange(1, 17, dtype=np.float32).reshape(1, 4, 4, 1)
+    moved = shift(batch, 1, -1)
+    assert moved.shape == batch.shape
+    # Turun satu baris, ke kiri satu kolom.
+    assert moved[0, 1:, :3, 0].tolist() == batch[0, :3, 1:, 0].tolist()
+    assert not moved[0, 0].any()
+    assert not moved[0, :, 3].any()
+    assert np.array_equal(shift(batch, 0, 0), batch)
+    with pytest.raises(ValueError):
+        shift(batch, 4, 0)
+
+
+def test_tta_views_are_ordered_per_view():
+    batch = np.random.default_rng(0).random((3, 32, 32, 3), dtype=np.float32)
+    views = tta_views(batch, "flip")
+    assert views.shape == (6, 32, 32, 3)
+    assert np.array_equal(views[:3], batch)
+    assert np.array_equal(views[3:], horizontal_flip(batch))
+    assert np.array_equal(tta_views(batch, "single"), batch)
+
+
+def test_every_tta_policy_starts_with_the_plain_image():
+    batch = np.random.default_rng(1).random((2, 32, 32, 3), dtype=np.float32)
+    assert TTA_POLICY in TTA_POLICIES
+    for name, policy in TTA_POLICIES.items():
+        views = tta_views(batch, name)
+        assert views.shape[0] == len(policy) * 2
+        assert np.array_equal(views[:2], batch)
+        assert len(set(policy)) == len(policy)
+    with pytest.raises(ValueError):
+        tta_views(batch, "tidak-ada")
