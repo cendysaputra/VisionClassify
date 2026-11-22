@@ -102,9 +102,3 @@ streamlit run app.py
 pip install -r requirements-dev.txt
 pytest
 ```
-
-## 🤝 Contributors
-
-* **[@cendysaputra](https://github.com/cendysaputra)**: Project owner & maintainer
-* **Antigravity (Google DeepMind)**: Upgrade ViT Small INT8 ONNX (98,42%), optimasi runtime, pembersihan kode & dokumentasi
-* **[@claude](https://github.com/claude)**: Implementasi awal SWA & Mode Umum
