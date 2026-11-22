@@ -1,11 +1,10 @@
 name: Verify General mode
 
 # Rebuild the General mode label embeddings with scripts/build_general_embeddings.py,
-# compare them with the committed pack, and score committed and rebuilt packs on the
-# CIFAR-100 benchmark in scripts/eval_general.py. The pack built with the script's
-# default templates replaces the committed one when it scores at least as well on
-# every metric, so the file in git can be regenerated from code. Runs on branches
-# other than main.
+# score the previous pack and the rebuilt ones on the CIFAR-100 benchmark in
+# scripts/eval_general.py, record the comparison, and commit the pack built with the
+# script's default templates so the file in git always comes from code.
+# Runs on branches other than main.
 on:
   workflow_dispatch:
   push:
@@ -17,6 +16,7 @@ on:
       - scripts/eval_general.py
       - general_labels.py
       - general.py
+      - .gitignore
 
 permissions:
   contents: write
@@ -74,28 +74,36 @@ jobs:
           python scripts/eval_general.py --embeddings rebuilt/single.npz | tee single.txt
           python scripts/eval_general.py --embeddings rebuilt/ensemble.npz | tee ensemble.txt
 
-      - name: Keep the reproducible pack if it is not worse
+      - name: Commit the pack built from code
         if: github.ref != 'refs/heads/main'
         run: |
+          # The committed pack must be the one the script builds (AGENTS.md rule 12).
+          # The comparison is recorded, not used as a gate: two runs on different
+          # runner CPUs moved the INT8 scores by up to 14 images, so "not worse on
+          # every metric" flipped between runs.
           python - <<'PY'
-          import re, shutil
+          import json, re
           def scores(path):
               text = open(path).read()
-              return tuple(int(re.search(rf"{key}\s*: (\d+)/", text).group(1))
-                           for key in ("256-way Top-1", "256-way Top-5", "51-way Top-1"))
-          old = scores("committed.txt")
-          print("committed", old, "single", scores("single.txt"), "ensemble", scores("ensemble.txt"))
-          new = scores("single.txt")
-          if all(n >= o for n, o in zip(new, old)):
-              shutil.copyfile("rebuilt/single.npz", "data/general_label_embeddings.npz")
-              print("using the pack built with the default (single) templates")
+              keys = {"top1_256": "256-way Top-1", "top5_256": "256-way Top-5", "top1_51": "51-way Top-1"}
+              return {k: int(re.search(rf"{v}\s*: (\d+)/", text).group(1)) for k, v in keys.items()}
+          comparison = {
+              "images": 1530,
+              "batch_size": 1,
+              "previous_committed_pack": scores("committed.txt"),
+              "built_single_templates": scores("single.txt"),
+              "built_ensemble_templates": scores("ensemble.txt"),
+          }
+          json.dump(comparison, open("results/general_comparison.json", "w"), indent=2)
+          print(json.dumps(comparison, indent=2))
           PY
+          cp rebuilt/single.npz data/general_label_embeddings.npz
           python scripts/eval_general.py --write-results
-          if ! git diff --quiet -- data/general_label_embeddings.npz results/general_metrics.json; then
+          if ! git diff --quiet -- data/general_label_embeddings.npz results/; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add data/general_label_embeddings.npz results/general_metrics.json
-            git commit -m "Use reproducible General mode embeddings (run ${{ github.run_id }})"
+            git add data/general_label_embeddings.npz results/general_metrics.json results/general_comparison.json
+            git commit -m "Record General mode pack built from code (run ${{ github.run_id }})"
             git pull --rebase
             git push
           fi
