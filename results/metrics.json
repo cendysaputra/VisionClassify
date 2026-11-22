@@ -8,29 +8,30 @@
   "model_bytes": 22450220,
   "app_inference": "single",
   "app_views": 1,
-  "test_set_used_for_training": false,
-  "test_set_used_for_selection": false,
+  "test_set_used_for_training": null,
+  "test_set_used_for_selection": null,
+  "provenance": "results/provenance/",
   "test_correct": {
-    "single": 9842
+    "single": 9836
   },
   "test_accuracy": {
-    "single": 0.9842
+    "single": 0.9836
   },
   "per_class_test_accuracy": {
-    "Airplane": 0.995,
-    "Automobile": 0.991,
-    "Bird": 0.986,
-    "Cat": 0.962,
-    "Deer": 0.991,
-    "Dog": 0.963,
-    "Frog": 0.996,
+    "Airplane": 0.994,
+    "Automobile": 0.99,
+    "Bird": 0.985,
+    "Cat": 0.961,
+    "Deer": 0.989,
+    "Dog": 0.961,
+    "Frog": 0.997,
     "Horse": 0.985,
     "Ship": 0.994,
-    "Truck": 0.979
+    "Truck": 0.98
   },
   "confusion_matrix": [
     [
-      995,
+      994,
       0,
       2,
       0,
@@ -38,12 +39,12 @@
       0,
       0,
       0,
-      2,
+      3,
       0
     ],
     [
       1,
-      991,
+      990,
       0,
       0,
       0,
@@ -51,13 +52,13 @@
       0,
       0,
       0,
-      8
+      9
     ],
     [
       2,
       0,
-      986,
-      2,
+      985,
+      3,
       6,
       2,
       2,
@@ -69,9 +70,9 @@
       0,
       1,
       1,
-      962,
-      6,
-      24,
+      961,
+      5,
+      26,
       5,
       0,
       1,
@@ -80,10 +81,10 @@
     [
       0,
       0,
-      4,
+      5,
       2,
-      991,
-      2,
+      989,
+      3,
       1,
       0,
       0,
@@ -93,9 +94,9 @@
       0,
       0,
       0,
-      30,
+      32,
       4,
-      963,
+      961,
       0,
       3,
       0,
@@ -104,11 +105,11 @@
     [
       0,
       0,
-      3,
+      2,
       0,
       0,
       1,
-      996,
+      997,
       0,
       0,
       0
@@ -117,8 +118,8 @@
       1,
       1,
       1,
-      1,
-      6,
+      0,
+      7,
       4,
       1,
       985,
@@ -139,7 +140,7 @@
     ],
     [
       1,
-      18,
+      17,
       0,
       0,
       0,
@@ -147,7 +148,7 @@
       0,
       0,
       2,
-      979
+      980
     ]
   ],
   "confusion_matrix_png": "results/confusion_matrix_tta.png"
