@@ -8,42 +8,44 @@
   "model_bytes": 22450220,
   "app_inference": "single",
   "app_views": 1,
-  "test_set_used_for_training": false,
-  "test_set_used_for_selection": false,
+  "test_set_used_for_training": null,
+  "test_set_used_for_selection": null,
+  "provenance": "results/provenance/",
+  "batch_size": 1,
   "test_correct": {
-    "single": 9842
+    "single": 9847
   },
   "test_accuracy": {
-    "single": 0.9842
+    "single": 0.9847
   },
   "per_class_test_accuracy": {
-    "Airplane": 0.995,
-    "Automobile": 0.991,
-    "Bird": 0.986,
-    "Cat": 0.962,
+    "Airplane": 0.993,
+    "Automobile": 0.992,
+    "Bird": 0.987,
+    "Cat": 0.966,
     "Deer": 0.991,
-    "Dog": 0.963,
-    "Frog": 0.996,
-    "Horse": 0.985,
+    "Dog": 0.964,
+    "Frog": 0.999,
+    "Horse": 0.983,
     "Ship": 0.994,
-    "Truck": 0.979
+    "Truck": 0.978
   },
   "confusion_matrix": [
     [
-      995,
+      993,
       0,
-      2,
+      3,
       0,
       1,
       0,
       0,
       0,
-      2,
+      3,
       0
     ],
     [
       1,
-      991,
+      992,
       0,
       0,
       0,
@@ -51,14 +53,14 @@
       0,
       0,
       0,
-      8
+      7
     ],
     [
       2,
       0,
-      986,
+      987,
       2,
-      6,
+      5,
       2,
       2,
       0,
@@ -69,9 +71,9 @@
       0,
       1,
       1,
-      962,
-      6,
-      24,
+      966,
+      4,
+      22,
       5,
       0,
       1,
@@ -93,53 +95,53 @@
       0,
       0,
       0,
-      30,
-      4,
-      963,
-      0,
-      3,
-      0,
-      0
-    ],
-    [
-      0,
-      0,
-      3,
-      0,
-      0,
-      1,
-      996,
-      0,
-      0,
-      0
-    ],
-    [
-      1,
-      1,
-      1,
-      1,
-      6,
-      4,
-      1,
-      985,
-      0,
-      0
-    ],
-    [
+      29,
       5,
+      964,
+      0,
+      2,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      999,
+      0,
+      0,
+      0
+    ],
+    [
+      1,
+      1,
+      2,
+      1,
+      8,
+      3,
+      1,
+      983,
+      0,
+      0
+    ],
+    [
+      4,
       0,
       1,
       0,
       0,
       0,
       0,
-      0,
+      1,
       994,
       0
     ],
     [
       1,
-      18,
+      19,
       0,
       0,
       0,
@@ -147,7 +149,7 @@
       0,
       0,
       2,
-      979
+      978
     ]
   ],
   "confusion_matrix_png": "results/confusion_matrix_tta.png"

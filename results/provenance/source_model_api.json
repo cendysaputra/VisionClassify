@@ -1,0 +1,120 @@
+{
+    "_id": "6611b1d07554a7f1b7b35c18",
+    "id": "MF21377197/vit-small-patch16-224-finetuned-Cifar10",
+    "private": false,
+    "pipeline_tag": "image-classification",
+    "library_name": "transformers",
+    "tags": [
+        "transformers",
+        "tensorboard",
+        "safetensors",
+        "vit",
+        "image-classification",
+        "generated_from_trainer",
+        "base_model:WinKawaks/vit-small-patch16-224",
+        "base_model:finetune:WinKawaks/vit-small-patch16-224",
+        "license:apache-2.0",
+        "endpoints_compatible",
+        "region:us"
+    ],
+    "downloads": 198,
+    "likes": 0,
+    "modelId": "MF21377197/vit-small-patch16-224-finetuned-Cifar10",
+    "author": "MF21377197",
+    "sha": "ff3c9332ba8094d9ed467a959eb683647f87127d",
+    "lastModified": "2024-04-07T09:44:12.000Z",
+    "gated": false,
+    "disabled": false,
+    "model-index": [
+        {
+            "name": "vit-small-patch16-224-finetuned-Cifar10",
+            "results": []
+        }
+    ],
+    "config": {
+        "architectures": [
+            "ViTForImageClassification"
+        ],
+        "model_type": "vit"
+    },
+    "cardData": {
+        "license": "apache-2.0",
+        "base_model": "WinKawaks/vit-small-patch16-224",
+        "tags": [
+            "generated_from_trainer"
+        ],
+        "metrics": [
+            "accuracy"
+        ],
+        "model-index": [
+            {
+                "name": "vit-small-patch16-224-finetuned-Cifar10",
+                "results": []
+            }
+        ]
+    },
+    "transformersInfo": {
+        "auto_model": "AutoModelForImageClassification",
+        "pipeline_tag": "image-classification",
+        "processor": "AutoImageProcessor"
+    },
+    "siblings": [
+        {
+            "rfilename": ".gitattributes"
+        },
+        {
+            "rfilename": "README.md"
+        },
+        {
+            "rfilename": "all_results.json"
+        },
+        {
+            "rfilename": "config.json"
+        },
+        {
+            "rfilename": "eval_results.json"
+        },
+        {
+            "rfilename": "model.safetensors"
+        },
+        {
+            "rfilename": "preprocessor_config.json"
+        },
+        {
+            "rfilename": "runs/Apr06_20-02-09_b854fac66b3a/events.out.tfevents.1712433774.b854fac66b3a.712.0"
+        },
+        {
+            "rfilename": "runs/Apr06_20-02-09_b854fac66b3a/events.out.tfevents.1712435663.b854fac66b3a.712.1"
+        },
+        {
+            "rfilename": "runs/Apr07_06-49-33_382a3c7617d8/events.out.tfevents.1712472584.382a3c7617d8.212.0"
+        },
+        {
+            "rfilename": "runs/Apr07_06-49-33_382a3c7617d8/events.out.tfevents.1712474865.382a3c7617d8.212.1"
+        },
+        {
+            "rfilename": "runs/Apr07_09-03-46_bdffce3cb052/events.out.tfevents.1712480627.bdffce3cb052.796.0"
+        },
+        {
+            "rfilename": "runs/Apr07_09-03-46_bdffce3cb052/events.out.tfevents.1712482451.bdffce3cb052.796.1"
+        },
+        {
+            "rfilename": "train_results.json"
+        },
+        {
+            "rfilename": "trainer_state.json"
+        },
+        {
+            "rfilename": "training_args.bin"
+        }
+    ],
+    "spaces": [],
+    "createdAt": "2024-04-06T20:34:24.000Z",
+    "safetensors": {
+        "parameters": {
+            "F32": 21669514
+        },
+        "total": 21669514
+    },
+    "usedStorage": 260203947
+}

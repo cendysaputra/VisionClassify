@@ -147,7 +147,10 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default=str(model_path()))
     parser.add_argument("--data-dir", default=str(ROOT / "data"))
-    parser.add_argument("--batch-size", type=int, default=64)
+    # The INT8 model quantizes activations per batch, so a prediction depends on
+    # the other images in the batch. The app scores one image at a time; batch
+    # size 1 measures what the app does.
+    parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--policies", nargs="+", default=[TTA_POLICY])
     parser.add_argument("--write-results", action="store_true")
     args = parser.parse_args()
@@ -187,8 +190,12 @@ def main() -> None:
         "model_bytes": path.stat().st_size,
         "app_inference": app_policy,
         "app_views": len(TTA_POLICIES[app_policy]),
-        "test_set_used_for_training": False,
-        "test_set_used_for_selection": False,
+        # Third-party weights: whether the test split was used during their
+        # fine-tune is not known from this repo. See results/provenance/.
+        "test_set_used_for_training": None,
+        "test_set_used_for_selection": None,
+        "provenance": "results/provenance/",
+        "batch_size": args.batch_size,
         "test_correct": correct,
         "test_accuracy": {policy: count / 10000 for policy, count in correct.items()},
         "per_class_test_accuracy": app_class,
