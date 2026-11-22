@@ -1,11 +1,4 @@
-"""Foto sungguhan untuk mode Umum.
-
-Lewati di CI. Jalankan lokal dengan model yang sudah di-cache atau jaringan ke Hugging Face:
-
-    GENERAL_LIVE=1 pytest tests/test_general_live.py
-
-Sumber foto ada di tests/fixtures/CREDITS.txt.
-"""
+"""Live CLIP tests."""
 
 from __future__ import annotations
 

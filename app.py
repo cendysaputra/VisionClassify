@@ -1,22 +1,18 @@
-"""Aplikasi Streamlit untuk klasifikasi gambar CIFAR-10 dan mode Umum."""
+"""Streamlit image classifier."""
 
 from html import escape
 from pathlib import Path
 
-import numpy as np
 import streamlit as st
 from PIL import Image
 
 from classify import (
     CLASS_NAMES,
     ImageLoadError,
-    average_probabilities,
+    load_cifar_backend,
     load_image,
     model_path,
-    preprocess,
     preview_image,
-    summarize_prediction,
-    tta_views,
 )
 
 MODE_CIFAR = "CIFAR-10"
@@ -37,7 +33,7 @@ def load_css(path: Path) -> None:
 
 
 def probability_bar_html(label: str, probability: float) -> str:
-    """HTML satu batang. Tanpa indentasi, agar Markdown tidak mengubahnya jadi kode."""
+    """Render probability bar."""
     persen = max(0.0, min(100.0, probability * 100))
     safe = escape(label)
     return (
@@ -49,16 +45,10 @@ def probability_bar_html(label: str, probability: float) -> str:
     )
 
 
-def predict(model, image: Image.Image):
-    batch = preprocess(image)
-    raw = np.asarray(model(tta_views(batch), training=False))
-    return summarize_prediction(average_probabilities(raw))
-
-
 @st.cache_data(show_spinner=False)
 def classify_upload(_model, payload: bytes):
     image = load_image(payload)
-    return preview_image(image), predict(_model, image)
+    return preview_image(image), _model.predict(image)
 
 
 @st.cache_data(show_spinner=False)
@@ -70,12 +60,7 @@ def classify_upload_general(payload: bytes, backend_id: str, _backend):
 
 @st.cache_resource
 def get_model():
-    path = model_path()
-    if not path.is_file():
-        raise FileNotFoundError(path)
-    from tensorflow.keras.models import load_model
-
-    return load_model(str(path), compile=False)
+    return load_cifar_backend()
 
 
 @st.cache_resource(show_spinner=False)
@@ -94,7 +79,7 @@ def selected_mode() -> str:
         required=True,
         width="stretch",
         help=(
-            "CIFAR-10 memakai model 10 kelas yang sudah ada di aplikasi. "
+            "CIFAR-10 memakai model ViT-Small ONNX 10 kelas di aplikasi. "
             "Umum mengenali ratusan benda sehari-hari dan mengunduh model sekali."
         ),
     )
@@ -106,7 +91,7 @@ def selected_mode() -> str:
 
 
 def release_other_model(active: str) -> None:
-    """Lepas model yang tidak dipakai agar kedua framework tidak menginap bersama."""
+    """Release inactive model."""
     previous = st.session_state.get("loaded_model_kind")
     if previous == active:
         return
@@ -143,8 +128,7 @@ def render_prediction(
     for item in prediction.ranking[:top_n]:
         bars.append(probability_bar_html(item.label, item.probability))
     bars.append("</div>")
-    # Satu baris HTML, tanpa baris kosong: Markdown menutup blok HTML di baris kosong
-    # dan menampilkan sisa tag sebagai kode.
+    # Single-line HTML block
     card = [
         '<div class="hasil-utama" role="status" aria-live="polite">',
         '<div class="hasil-label">Hasil prediksi</div>',
@@ -201,11 +185,10 @@ release_other_model(mode)
 
 uploaded_file = None
 if mode == MODE_CIFAR:
-    st.write("Model CNN memprediksi objek dari gambar yang diunggah.")
+    st.write("Model ViT-Small ONNX memprediksi objek ke dalam 10 kelas CIFAR-10.")
     st.caption(
-        "Gambar diubah menjadi 32×32 piksel. Foto yang tidak persegi di-crop dari tengah, "
-        "jadi objek sebaiknya berada di tengah bingkai. Prediksi merata-ratakan gambar "
-        "dengan cermin horizontalnya."
+        "Gambar di-crop persegi dari tengah lalu diubah menjadi 224×224 piksel, "
+        "jadi objek sebaiknya berada di tengah bingkai."
     )
     model = None
     try:
@@ -243,7 +226,7 @@ if mode == MODE_CIFAR:
             render_prediction(
                 preview,
                 prediction,
-                image_note="Model melihat crop tengah 32×32 dan cermin horizontalnya.",
+                image_note="Model melihat crop tengah 224×224 piksel.",
                 heading="3 kelas teratas",
                 top_n=3,
                 headline=prediction.label,

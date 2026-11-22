@@ -157,8 +157,7 @@ button[title="View fullscreen"] {display: none;}
     border-radius: 5px;
 }
 
-.judul-peringkat,
-.judul-top3 {
+.judul-peringkat {
     font-size: 15px;
     font-weight: 600;
     color: #3d4753;

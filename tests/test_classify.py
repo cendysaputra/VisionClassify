@@ -9,20 +9,20 @@ from classify import (
     LOW_CONFIDENCE_THRESHOLD,
     MODEL_FILENAME,
     MODEL_INPUT_SIZE,
+    TTA_POLICIES,
+    TTA_POLICY,
     ImageLoadError,
     average_probabilities,
     class_probabilities,
     horizontal_flip,
-    shift,
-    tta_views,
-    TTA_POLICIES,
-    TTA_POLICY,
     load_image,
     model_path,
     preprocess,
     preview_image,
+    softmax,
     summarize_prediction,
     top_indices,
+    tta_views,
 )
 
 
@@ -53,7 +53,8 @@ def test_load_image_applies_exif_orientation():
     image.putpixel((1, 0), (0, 255, 0))
     image.putpixel((2, 0), (0, 0, 255))
     exif = image.getexif()
-    exif[0x0112] = 6  # rotasi 90 derajat searah jarum jam
+    # Rotate 90 clockwise
+    exif[0x0112] = 6
     loaded = load_image(_png_bytes(image, exif.tobytes()))
     assert loaded.size == (1, 3)
     assert loaded.getpixel((0, 0)) == (255, 0, 0)
@@ -92,15 +93,14 @@ def test_preview_limits_the_long_side():
     assert preview.size[0] > preview.size[1]
 
 
-def test_square_image_matches_previous_resize_path():
+def test_square_image_matches_vit_normalization():
     rng = np.random.default_rng(0)
     pixels = rng.integers(0, 256, size=(40, 40, 3), dtype=np.uint8)
     image = Image.fromarray(pixels, mode="RGB")
 
-    legacy = image.copy()
-    legacy.thumbnail((512, 512))
-    legacy = legacy.resize((MODEL_INPUT_SIZE, MODEL_INPUT_SIZE))
-    expected = np.expand_dims(np.asarray(legacy, dtype=np.float32) / 255.0, 0)
+    resized = image.resize((MODEL_INPUT_SIZE, MODEL_INPUT_SIZE), Image.Resampling.BILINEAR)
+    arr = (np.asarray(resized, dtype=np.float32) / 255.0 - 0.5) / 0.5
+    expected = np.expand_dims(np.transpose(arr, (2, 0, 1)), 0)
 
     np.testing.assert_array_equal(preprocess(image), expected)
 
@@ -112,12 +112,12 @@ def test_wide_image_uses_center_instead_of_stretching_edges():
             image.putpixel((x, y), (0, 255, 0))
 
     batch = preprocess(image)
-    assert batch.shape == (1, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE, 3)
+    assert batch.shape == (1, 3, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE)
     assert batch.dtype == np.float32
-    assert float(batch.min()) >= 0.0
+    assert float(batch.min()) >= -1.0
     assert float(batch.max()) <= 1.0
-    assert np.all(batch[0, :, :, 1] > 0.95)
-    assert np.all(batch[0, :, :, 0] < 0.05)
+    assert np.all(batch[0, 1] > 0.95)
+    assert np.all(batch[0, 0] < -0.95)
 
 
 def test_top_indices_are_descending():
@@ -146,7 +146,7 @@ def test_summarize_prediction_accepts_a_confident_vector():
 
 def test_preprocess_accepts_grayscale_directly():
     batch = preprocess(Image.new("L", (8, 8), 255))
-    assert batch.shape == (1, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE, 3)
+    assert batch.shape == (1, 3, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE)
     assert np.allclose(batch, 1.0)
 
 
@@ -159,13 +159,21 @@ def test_load_image_reads_webp():
 
 
 def test_horizontal_flip_mirrors_the_width_axis():
-    batch = np.zeros((1, 2, 3, 3), dtype=np.float32)
+    batch = np.zeros((1, 3, 2, 3), dtype=np.float32)
     batch[0, 0, 0, 0] = 1
     flipped = horizontal_flip(batch)
     assert flipped.shape == batch.shape
-    assert flipped[0, 0, -1, 0] == pytest.approx(1)
+    assert flipped[0, 0, 0, -1] == pytest.approx(1)
     assert flipped[0, 0, 0, 0] == pytest.approx(0)
     assert np.shares_memory(flipped, batch) is False
+
+
+def test_softmax_normalizes_logits():
+    probs = softmax(np.array([[2.0, 2.0, 2.0]]))
+    assert probs.shape == (1, 3)
+    assert np.allclose(probs, 1.0 / 3.0)
+    with pytest.raises(ValueError):
+        softmax(np.array([[np.nan, 0.0]]))
 
 
 def test_average_probabilities_means_the_two_views():
@@ -199,30 +207,17 @@ def test_class_probabilities_reject_bad_shapes_and_values():
         class_probabilities(np.full(10, np.nan))
 
 
-def test_shift_moves_pixels_and_fills_the_gap_with_zero():
-    batch = np.arange(1, 17, dtype=np.float32).reshape(1, 4, 4, 1)
-    moved = shift(batch, 1, -1)
-    assert moved.shape == batch.shape
-    # Turun satu baris, ke kiri satu kolom.
-    assert moved[0, 1:, :3, 0].tolist() == batch[0, :3, 1:, 0].tolist()
-    assert not moved[0, 0].any()
-    assert not moved[0, :, 3].any()
-    assert np.array_equal(shift(batch, 0, 0), batch)
-    with pytest.raises(ValueError):
-        shift(batch, 4, 0)
-
-
 def test_tta_views_are_ordered_per_view():
-    batch = np.random.default_rng(0).random((3, 32, 32, 3), dtype=np.float32)
+    batch = np.random.default_rng(0).random((3, 3, 16, 16), dtype=np.float32)
     views = tta_views(batch, "flip")
-    assert views.shape == (6, 32, 32, 3)
+    assert views.shape == (6, 3, 16, 16)
     assert np.array_equal(views[:3], batch)
     assert np.array_equal(views[3:], horizontal_flip(batch))
     assert np.array_equal(tta_views(batch, "single"), batch)
 
 
 def test_every_tta_policy_starts_with_the_plain_image():
-    batch = np.random.default_rng(1).random((2, 32, 32, 3), dtype=np.float32)
+    batch = np.random.default_rng(1).random((2, 3, 16, 16), dtype=np.float32)
     assert TTA_POLICY in TTA_POLICIES
     for name, policy in TTA_POLICIES.items():
         views = tta_views(batch, name)

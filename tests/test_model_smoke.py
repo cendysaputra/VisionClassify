@@ -1,22 +1,19 @@
-import numpy as np
 import pytest
 from PIL import Image
 
-from classify import CLASS_NAMES, model_path, preprocess, summarize_prediction
+from classify import CLASS_NAMES, load_cifar_backend, model_path
 
 
 def test_saved_model_outputs_a_probability_distribution():
-    pytest.importorskip("tensorflow")
-    from tensorflow.keras.models import load_model
+    pytest.importorskip("onnxruntime")
 
     path = model_path()
     if not path.is_file():
-        pytest.skip(f"{path.name} tidak ada")
+        pytest.skip(f"{path.name} missing")
 
-    model = load_model(str(path), compile=False)
+    backend = load_cifar_backend(path)
     image = Image.new("RGB", (48, 36), (30, 120, 200))
-    raw = np.asarray(model(preprocess(image), training=False))
-    summary = summarize_prediction(raw)
+    summary = backend.predict(image)
 
     assert summary.label in CLASS_NAMES
     total = sum(item.probability for item in summary.ranking)

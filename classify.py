@@ -1,11 +1,10 @@
-"""Helper klasifikasi CIFAR-10 yang tidak bergantung pada Streamlit.
-
-Model mengharapkan gambar RGB 32x32 dengan piksel 0-1, sama seperti train.py.
-"""
+"""CIFAR-10 ONNX classifier."""
 
 from __future__ import annotations
 
 import io
+import os
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -25,33 +24,24 @@ CLASS_NAMES: tuple[str, ...] = (
     "Truck",
 )
 
-MODEL_FILENAME = "model_cnn_cifar10_v6.h5"
-MODEL_INPUT_SIZE = 32
+MODEL_FILENAME = "model_vit_cifar10.onnx"
+MODEL_INPUT_SIZE = 224
 PREVIEW_MAX_SIDE = 512
-# Batasi decode agar file kecil tidak berkembang menjadi gambar raksasa.
+# Limit image pixels
 MAX_IMAGE_PIXELS = 40_000_000
 LOW_CONFIDENCE_THRESHOLD = 0.5
-
-# Tampilan yang dirata-ratakan saat prediksi: (geser_y, geser_x, cermin).
-# Geseran memakai piksel; tepi yang kosong diisi hitam, sama dengan pad + crop
-# saat pelatihan.
-_CROSS_1 = ((0, 0), (-1, 0), (1, 0), (0, -1), (0, 1))
-_CROSS_2 = ((0, 0), (-2, 0), (2, 0), (0, -2), (0, 2))
-TTA_POLICIES: dict[str, tuple[tuple[int, int, bool], ...]] = {
-    "single": ((0, 0, False),),
-    "flip": ((0, 0, False), (0, 0, True)),
-    "flip_shift1": tuple((dy, dx, flip) for flip in (False, True) for dy, dx in _CROSS_1),
-    "flip_shift2": tuple((dy, dx, flip) for flip in (False, True) for dy, dx in _CROSS_2),
+TTA_POLICIES: dict[str, tuple[bool, ...]] = {
+    "single": (False,),
+    "flip": (False, True),
 }
-# Kebijakan yang dipakai aplikasi. Dipilih dari akurasi validasi, bukan uji
-# (results/swa_metrics.json).
-TTA_POLICY = "flip_shift1"
+# Active TTA policy
+TTA_POLICY = "single"
 
 _UNREADABLE = "Gambar tidak dapat dibaca. Gunakan file JPG, PNG, atau WEBP yang valid."
 
 
 class ImageLoadError(ValueError):
-    """Berkas unggahan tidak bisa dipakai sebagai gambar."""
+    """Unreadable image error."""
 
 
 @dataclass(frozen=True)
@@ -74,7 +64,7 @@ def model_path(base_dir: Path | None = None) -> Path:
 
 
 def load_image(source: bytes | bytearray | io.BufferedIOBase) -> Image.Image:
-    """Buka unggahan, terapkan orientasi EXIF, lalu kembalikan gambar RGB."""
+    """Decode RGB image."""
     if isinstance(source, (bytes, bytearray)):
         source = io.BytesIO(source)
     if hasattr(source, "seek"):
@@ -96,76 +86,65 @@ def load_image(source: bytes | bytearray | io.BufferedIOBase) -> Image.Image:
 
 
 def preview_image(image: Image.Image, max_side: int = PREVIEW_MAX_SIDE) -> Image.Image:
-    """Salinan untuk ditampilkan, sisi terpanjang paling banyak `max_side` piksel."""
+    """Resize preview image."""
     preview = image.copy()
     preview.thumbnail((max_side, max_side))
     return preview
 
 
 def center_square(image: Image.Image) -> Image.Image:
-    """Crop persegi dari tengah agar resize tidak meregangkan foto."""
+    """Center square crop."""
     width, height = image.size
     side = min(width, height)
     left = (width - side) // 2
     top = (height - side) // 2
-    # copy() melepaskan crop dari piksel asli supaya preview tidak berubah.
+    # Detach cropped pixels
     return image.crop((left, top, left + side, top + side)).copy()
 
 
 def preprocess(image: Image.Image) -> np.ndarray:
-    """Batch (1, 32, 32, 3) dengan nilai piksel di rentang 0-1."""
+    """Preprocess ViT batch."""
     if image.mode != "RGB":
         image = image.convert("RGB")
     prepared = center_square(image)
     if max(prepared.size) > PREVIEW_MAX_SIDE:
-        prepared.thumbnail((PREVIEW_MAX_SIDE, PREVIEW_MAX_SIDE))
-    resized = prepared.resize((MODEL_INPUT_SIZE, MODEL_INPUT_SIZE))
-    array = np.asarray(resized, dtype=np.float32) / 255.0
+        prepared.thumbnail((PREVIEW_MAX_SIDE, PREVIEW_MAX_SIDE), Image.Resampling.BILINEAR)
+    resized = prepared.resize((MODEL_INPUT_SIZE, MODEL_INPUT_SIZE), Image.Resampling.BILINEAR)
+    array = (np.asarray(resized, dtype=np.float32) / 255.0 - 0.5) / 0.5
     if array.shape != (MODEL_INPUT_SIZE, MODEL_INPUT_SIZE, 3):
         raise ImageLoadError("Gambar tidak dapat diubah ke ukuran masukan model.")
-    return array[np.newaxis, ...]
+    nchw = np.transpose(array, (2, 0, 1))
+    return np.ascontiguousarray(nchw[np.newaxis, ...], dtype=np.float32)
 
 
 def horizontal_flip(batch: np.ndarray) -> np.ndarray:
-    """Salinan batch NHWC yang dicerminkan pada sumbu lebar."""
+    """Flip NCHW width."""
     array = np.asarray(batch)
     if array.ndim != 4:
-        raise ValueError("Batch cermin harus berbentuk (N, tinggi, lebar, kanal).")
-    return np.ascontiguousarray(np.flip(array, axis=2))
-
-
-def shift(batch: np.ndarray, dy: int, dx: int) -> np.ndarray:
-    """Geser batch NHWC sejauh (dy, dx) piksel; tepi yang terbuka diisi nol."""
-    array = np.asarray(batch)
-    if array.ndim != 4:
-        raise ValueError("Batch geser harus berbentuk (N, tinggi, lebar, kanal).")
-    height, width = array.shape[1:3]
-    if abs(dy) >= height or abs(dx) >= width:
-        raise ValueError("Geseran melebihi ukuran gambar.")
-    out = np.zeros_like(array)
-    out[:, max(dy, 0) : height + min(dy, 0), max(dx, 0) : width + min(dx, 0)] = array[
-        :, max(-dy, 0) : height + min(-dy, 0), max(-dx, 0) : width + min(-dx, 0)
-    ]
-    return out
+        raise ValueError("Batch cermin harus berbentuk (N, kanal, tinggi, lebar).")
+    return np.ascontiguousarray(np.flip(array, axis=3))
 
 
 def tta_views(batch: np.ndarray, policy: str = TTA_POLICY) -> np.ndarray:
-    """Semua tampilan `policy` untuk batch NHWC, disusun per tampilan.
-
-    Hasilnya (tampilan * N, tinggi, lebar, kanal): N baris pertama adalah
-    tampilan pertama dari setiap gambar, dan seterusnya.
-    """
+    """Build TTA views."""
     if policy not in TTA_POLICIES:
         raise ValueError(f"Kebijakan TTA tidak dikenal: {policy!r}")
-    views = []
-    for dy, dx, flip in TTA_POLICIES[policy]:
-        view = shift(batch, dy, dx) if (dy or dx) else np.asarray(batch)
-        views.append(horizontal_flip(view) if flip else view)
+    views = [horizontal_flip(batch) if flip else np.asarray(batch) for flip in TTA_POLICIES[policy]]
     return np.concatenate(views, axis=0)
 
 
+def softmax(logits: np.ndarray) -> np.ndarray:
+    """Compute stable softmax."""
+    values = np.asarray(logits, dtype=np.float64)
+    if not np.all(np.isfinite(values)):
+        raise ValueError("Model mengembalikan nilai yang tidak valid.")
+    shifted = values - np.max(values, axis=-1, keepdims=True)
+    exponents = np.exp(shifted)
+    return exponents / np.sum(exponents, axis=-1, keepdims=True)
+
+
 def average_probabilities(views: np.ndarray) -> np.ndarray:
-    """Rata-rata beberapa vektor 10 kelas, misalnya gambar asli dan cerminnya."""
+    """Average view probabilities."""
     rows = np.asarray(views, dtype=np.float64)
     if rows.ndim != 2 or rows.shape[0] < 1 or rows.shape[1] != len(CLASS_NAMES):
         raise ValueError(
@@ -178,7 +157,7 @@ def average_probabilities(views: np.ndarray) -> np.ndarray:
 
 
 def class_probabilities(output: np.ndarray) -> np.ndarray:
-    """Vektor 10 probabilitas dari keluaran model berbentuk (10,) atau (1, 10)."""
+    """Validate probability vector."""
     probs = np.asarray(output, dtype=np.float64)
     expected = (len(CLASS_NAMES),)
     if probs.shape == (1, len(CLASS_NAMES)):
@@ -214,3 +193,44 @@ def summarize_prediction(output: np.ndarray) -> Prediction:
         low_confidence=top.probability < LOW_CONFIDENCE_THRESHOLD,
         ranking=ranking,
     )
+
+
+class CifarBackend:
+    """ONNX CIFAR-10 backend."""
+
+    def __init__(self, session: object):
+        self._session = session
+        self._lock = threading.Lock()
+        self._input_name = session.get_inputs()[0].name
+        self._output_name = session.get_outputs()[0].name
+
+    def predict_logits(self, batch: np.ndarray) -> np.ndarray:
+        with self._lock:
+            output = self._session.run([self._output_name], {self._input_name: batch})[0]
+        return np.asarray(output, dtype=np.float32)
+
+    def predict(self, image: Image.Image, policy: str = TTA_POLICY) -> Prediction:
+        batch = preprocess(image)
+        logits = self.predict_logits(tta_views(batch, policy))
+        probs = softmax(logits)
+        return summarize_prediction(average_probabilities(probs))
+
+
+def load_cifar_backend(path: Path | None = None) -> CifarBackend:
+    """Load ONNX session."""
+    source = model_path() if path is None else Path(path)
+    if not source.is_file():
+        raise FileNotFoundError(source)
+    import onnxruntime as ort
+
+    options = ort.SessionOptions()
+    options.intra_op_num_threads = min(4, os.cpu_count() or 1)
+    options.inter_op_num_threads = 1
+    options.log_severity_level = 3
+    options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+    session = ort.InferenceSession(
+        str(source),
+        sess_options=options,
+        providers=["CPUExecutionProvider"],
+    )
+    return CifarBackend(session)

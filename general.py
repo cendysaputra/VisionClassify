@@ -1,9 +1,4 @@
-"""Klasifikasi zero-shot untuk mode Umum.
-
-Foto dibanding dengan embedding teks CLIP ViT-B/32 yang sudah dihitung
-untuk daftar label. Bobot vision diunduh saat runtime dan tidak masuk git.
-TensorFlow tidak diimpor di sini, jadi mode CIFAR-10 tidak memuat model ini.
-"""
+"""CLIP general classifier."""
 
 from __future__ import annotations
 
@@ -30,8 +25,7 @@ VISION_BYTES = 89_117_001
 EMBEDDINGS_FILENAME = "general_label_embeddings.npz"
 BACKEND_ID = "clip-vit-b32-int8-583fd111"
 LOGIT_SCALE = 100.0
-# Ambang dipilih pada foto sungguhan: orang, rumah, dan batu yang jelas lolos,
-# sementara noise, warna polos, dan dua label yang hampir seri ditandai tidak yakin.
+# Confidence thresholds
 NULL_MARGIN = 0.022
 MIN_LABEL_GAP = 0.006
 INPUT_SIZE = 224
@@ -43,7 +37,7 @@ _DOWNLOAD_CHUNK = 1024 * 1024
 
 
 class GeneralModelError(RuntimeError):
-    """Model Umum tidak bisa diunduh, dibaca, atau dijalankan."""
+    """General model error."""
 
 
 def embeddings_path() -> Path:
@@ -91,7 +85,7 @@ def _download(url: str, dest: Path) -> None:
 
 
 def ensure_vision_model() -> Path:
-    """Pakai berkas cache jika hash-nya cocok. Jika tidak, unduh lalu periksa."""
+    """Verify cached weights."""
     path = vision_model_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.is_file() and _file_sha256(path) == VISION_SHA256:
@@ -135,7 +129,7 @@ def score_embeddings(
     prompt_label_index: np.ndarray,
     null_embeds: np.ndarray,
 ) -> Prediction:
-    """Pilih label dari kemiripan cosine. Beberapa prompt untuk satu label diambil yang maksimum."""
+    """Score cosine similarity."""
     image = _unit_rows(np.asarray(image_embed, dtype=np.float32).reshape(-1))[0]
     prompts = _unit_rows(prompt_embeds)
     nulls = _unit_rows(null_embeds)
@@ -184,7 +178,7 @@ def _limit_aspect(image: Image.Image, max_ratio: int) -> Image.Image:
 
 
 def preprocess_general(image: Image.Image) -> np.ndarray:
-    """Batch NCHW 224x224 yang dinormalisasi seperti praproses CLIP."""
+    """Preprocess CLIP input."""
     prepared = image.convert("RGB")
     prepared.thumbnail((_MAX_SIDE, _MAX_SIDE), Image.Resampling.BICUBIC)
     prepared = _limit_aspect(prepared, _MAX_ASPECT)
@@ -239,7 +233,7 @@ def load_embedding_pack(path: Path | None = None) -> dict[str, np.ndarray]:
 
 
 class GeneralBackend:
-    """Session ONNX vision plus embedding label yang sudah dihitung."""
+    """ONNX CLIP backend."""
 
     def __init__(self, session: object, pack: dict[str, np.ndarray], cache_id: str = BACKEND_ID):
         self._session = session
@@ -269,7 +263,7 @@ class GeneralBackend:
 
 
 class _FixedBackend:
-    """Backend uji. Tidak memuat ONNX."""
+    """Mock test backend."""
 
     def __init__(self, prediction: Prediction, cache_id: str):
         self._prediction = prediction
@@ -312,7 +306,7 @@ def load_backend() -> GeneralBackend | _FixedBackend:
     model_path = ensure_vision_model()
     pack = load_embedding_pack()
     options = ort.SessionOptions()
-    options.intra_op_num_threads = 1
+    options.intra_op_num_threads = min(4, os.cpu_count() or 1)
     options.inter_op_num_threads = 1
     options.log_severity_level = 3
     options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL

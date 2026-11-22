@@ -1,1 +1,1 @@
-de6b795c6fbeed5d1a8801bf7644b051e63c41323f9fd53eff9a24f03608b599  model_cnn_cifar10_v6.h5
+a26c2423afb9f3434f4243decba413211b777d7142f76b6fdbddcbdcfc7f1145  model_vit_cifar10.onnx
