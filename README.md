@@ -1,12 +1,12 @@
 # VisionClassify
 
-Lightweight Streamlit and ONNX Runtime web app with **98.47%** CIFAR 10 test accuracy and **84.12%** Top 5 accuracy across **256** general object labels. Both numbers are measured one image at a time, as the app runs.
+Lightweight Streamlit and ONNX Runtime web app with **98.47%** CIFAR 10 test accuracy and **83.99%** Top 5 accuracy across **256** general object labels. Both numbers are measured one image at a time, as the app runs.
 
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.59-FF4B4B)
 ![ONNX Runtime](https://img.shields.io/badge/Runtime-ONNX%20INT8-005CED)
 ![CIFAR 10](https://img.shields.io/badge/CIFAR%2010-98.47%25-2EA043)
-![General Top 5](https://img.shields.io/badge/General%20Top%205-84.12%25-0969DA)
+![General Top 5](https://img.shields.io/badge/General%20Top%205-83.99%25-0969DA)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
 ## Overview
@@ -93,17 +93,17 @@ Zero shot CLIP ViT B/16 (INT8 ONNX) on 1,530 CIFAR 100 test images (30 per class
     <tr>
       <td align="left">256 Label Top 1</td>
       <td align="left">55.03%</td>
-      <td align="left"><b>60.78%</b></td>
+      <td align="left"><b>61.70%</b></td>
     </tr>
     <tr>
       <td align="left">51 Class Top 1</td>
       <td align="left">70.92%</td>
-      <td align="left"><b>73.73%</b></td>
+      <td align="left"><b>73.92%</b></td>
     </tr>
     <tr>
       <td align="left">256 Label Top 5</td>
       <td align="left">81.70%</td>
-      <td align="left"><b>84.12%</b></td>
+      <td align="left"><b>83.99%</b></td>
     </tr>
     <tr>
       <td align="left">Vision Weights Size</td>
@@ -113,9 +113,9 @@ Zero shot CLIP ViT B/16 (INT8 ONNX) on 1,530 CIFAR 100 test images (30 per class
   </tbody>
 </table>
 
-The B/32 column is carried over from the commit that switched to B/16 and was not re measured. The B/16 column is measured one image at a time. Two runs on different GitHub runners gave 936 and 930 of 1,530 for 256 label Top 1, so differences below about half a point are noise.
+The B/32 column is carried over from the commit that switched to B/16 and was not re measured. The B/16 column is measured one image at a time. The same pack scored differently on different GitHub runners (936 and 930 of 1,530 for 256 label Top 1 in two runs), so differences below about half a point are noise.
 
-The label embeddings in `data/general_label_embeddings.npz` are built by `scripts/build_general_embeddings.py` from the prompts in `general_labels.py`. A template ensemble was tried and scored lower on every metric, so each label keeps its written prompts. Labels and prompts were compared on this same benchmark, so its numbers may be slightly optimistic.
+The label embeddings in `data/general_label_embeddings.npz` are built by `scripts/build_general_embeddings.py` from the prompts in `general_labels.py`, and the **Verify General mode** workflow commits whatever that script builds. In the same run the previous pack (built outside the repo) scored 930, 1,287 and 1,128 for the three rows, and a seven template ensemble scored 928, 1,286 and 1,121; see [`results/general_comparison.json`](results/general_comparison.json). These differences are within the noise above.
 
 * Metrics: [`results/general_metrics.json`](results/general_metrics.json)
 * Verify: `python scripts/eval_general.py`, or the **Verify General mode** workflow
