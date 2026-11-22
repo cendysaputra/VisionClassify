@@ -13,6 +13,13 @@ Lightweight Streamlit and ONNX Runtime web app achieving **98.42%** CIFAR 10 tes
 
 </div>
 
+## Overview
+
+Upload any JPG, PNG, or WEBP photo to classify objects directly in your browser. Both inference modes run on a unified **ONNX Runtime** backend without TensorFlow for fast startup and low memory usage.
+
+* **CIFAR 10 Mode**: Predicts 10 classic object categories using a quantized **ViT Small/16** model bundled in the repository.
+* **General Mode**: Recognizes 256 everyday objects, places, animals, and scenes using zero shot **CLIP ViT B/16** with automatic low confidence detection.
+
 ## Screenshots
 
 <table>
