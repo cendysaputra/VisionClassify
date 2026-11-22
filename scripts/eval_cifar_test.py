@@ -187,8 +187,11 @@ def main() -> None:
         "model_bytes": path.stat().st_size,
         "app_inference": app_policy,
         "app_views": len(TTA_POLICIES[app_policy]),
-        "test_set_used_for_training": False,
-        "test_set_used_for_selection": False,
+        # Third-party weights: whether the test split was used during their
+        # fine-tune is not known from this repo. See results/provenance/.
+        "test_set_used_for_training": None,
+        "test_set_used_for_selection": None,
+        "provenance": "results/provenance/",
         "test_correct": correct,
         "test_accuracy": {policy: count / 10000 for policy, count in correct.items()},
         "per_class_test_accuracy": app_class,
