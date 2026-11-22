@@ -77,13 +77,23 @@ def main() -> None:
     parser.add_argument("--data-dir", default=str(ROOT / "data"))
     parser.add_argument("--per-class", type=int, default=30)
     parser.add_argument("--batch-size", type=int, default=32)
+    parser.add_argument("--embeddings", default=None,
+                        help="Score another label embedding pack instead of the committed one.")
     parser.add_argument("--write-results", action="store_true")
     args = parser.parse_args()
+    if args.embeddings and args.write_results:
+        parser.error("--write-results only records the committed embedding pack")
 
     images, targets, subset_indices = load_overlapping_test(Path(args.data_dir), args.per_class)
     backend = general.load_backend()
-    prompts = general._unit_rows(backend.prompt_embeds)
-    label_index = backend.prompt_labels
+    if args.embeddings:
+        pack = general.load_embedding_pack(Path(args.embeddings))
+        prompts = general._unit_rows(pack["embeddings"])
+        label_index = pack["label_index"]
+        print(f"embeddings: {args.embeddings}")
+    else:
+        prompts = general._unit_rows(backend.prompt_embeds)
+        label_index = backend.prompt_labels
     subset_mask = np.zeros(len(LABELS), dtype=bool)
     subset_mask[subset_indices] = True
 
