@@ -13,9 +13,9 @@ One embedding row is written per prompt in general_labels.prompt_texts(), so
 the row layout always matches the code. With --templates ensemble, a label
 without hand-written prompts gets the mean of several template sentences in
 its single row (prompt ensembling, Radford et al. 2021). Hand-written prompts
-are embedded as written. The committed pack uses --templates single: on the
-benchmark in scripts/eval_general.py it beat both the earlier ensembled pack
-and this ensemble on every metric (results/general_metrics.json).
+are embedded as written. The committed pack uses --templates single; the
+ensemble scored within noise of it on scripts/eval_general.py and adds 1,488
+sentences (results/general_comparison.json).
 """
 
 from __future__ import annotations
