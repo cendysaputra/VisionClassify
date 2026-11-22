@@ -9,6 +9,7 @@ Aplikasi web ringan berbasis Streamlit dan ONNX Runtime untuk klasifikasi gambar
 ![ONNX Runtime](https://img.shields.io/badge/Runtime-ONNX%20INT8-005CED)
 ![Test Accuracy](https://img.shields.io/badge/Test%20Accuracy-98.42%25-2EA043)
 ![Model Size](https://img.shields.io/badge/Model%20Size-22.4%20MB-6F42C1)
+![License](https://img.shields.io/badge/License-MIT-blue)
 
 </div>
 
@@ -102,3 +103,7 @@ streamlit run app.py
 pip install -r requirements-dev.txt
 pytest
 ```
+
+## Lisensi
+
+Proyek ini dirilis di bawah [Lisensi MIT](LICENSE).
