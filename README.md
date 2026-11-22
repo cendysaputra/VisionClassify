@@ -1,115 +1,93 @@
 <div align="center">
 
-# 🖼️ CIFAR-10 & General Image Classifier
+# 🖼️ Aplikasi Klasifikasi Gambar
 
-**Aplikasi klasifikasi gambar ringan berbasis Streamlit & ONNX Runtime — akurasi 98,42% pada CIFAR-10 resmi dan 256 label sehari-hari dalam satu antarmuka.**
+Aplikasi web ringan berbasis Streamlit dan ONNX Runtime untuk klasifikasi gambar dengan akurasi uji **98,42%** pada CIFAR 10 serta **256 label** benda sehari hari.
 
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.59-FF4B4B?logo=streamlit&logoColor=white)
 ![ONNX Runtime](https://img.shields.io/badge/Runtime-ONNX%20INT8-005CED?logo=onnx&logoColor=white)
-![CIFAR-10 Accuracy](https://img.shields.io/badge/CIFAR--10%20Test-98.42%25-2EA043)
+![Test Accuracy](https://img.shields.io/badge/Test%20Accuracy-98.42%25-2EA043)
 ![Model Size](https://img.shields.io/badge/Model%20Size-22.4%20MB-6F42C1)
 
 </div>
 
----
+## 📸 Tampilan Aplikasi
 
-## ✨ Fitur Utama
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <img src="results/screenshot_cifar10.png" alt="Tampilan Mode CIFAR 10" width="100%" /><br />
+      <sub><b>Mode CIFAR 10</b>: Prediksi 10 kelas dengan ViT Small ONNX (224×224)</sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="results/screenshot_umum.png" alt="Tampilan Mode Umum" width="100%" /><br />
+      <sub><b>Mode Umum</b>: Prediksi 256 label harian dengan CLIP ViT B/32 ONNX</sub>
+    </td>
+  </tr>
+</table>
 
-- **🎯 Mode CIFAR-10 (98,42% Test Accuracy)** — Menggunakan **ViT-Small/16** terkuantisasi **INT8 ONNX** (`model_vit_cifar10.onnx`, 22,4 MB) untuk mengklasifikasikan 10 kelas: *Airplane, Automobile, Bird, Cat, Deer, Dog, Frog, Horse, Ship,* dan *Truck*.
-- **🌍 Mode Umum (256 Label Zero-Shot)** — Menggunakan **CLIP ViT-B/32** (INT8 ONNX) dengan *precomputed text embeddings* untuk mengenali 256 benda sehari-hari (orang, rumah, batu, hewan, makanan, kendaraan, tempat, dll.) dalam bahasa Indonesia + deteksi otomatis **Tidak yakin (not sure)**.
-- **⚡ Unified ONNX Runtime (Tanpa TensorFlow)** — Kedua mode berjalan penuh di `onnxruntime`, memangkas ukuran dependensi, menurunkan konsumsi RAM secara drastis, dan mencegah *out-of-memory* di Streamlit Community Cloud.
-- **🛡️ Praproses Aman & Responsif** — Koreksi orientasi EXIF otomatis, batas piksel anti-*decompression bomb*, *center-square crop* agar foto asli tidak terdistorsi, serta proteksi unggahan hingga 5 MB.
+## ✨ Ringkasan Fitur
 
----
+* **Mode CIFAR 10**: Mengklasifikasikan 10 kelas (*Airplane, Automobile, Bird, Cat, Deer, Dog, Frog, Horse, Ship, Truck*) dengan akurasi uji resmi **98,42%**.
+* **Mode Umum**: Mengenali 256 benda sehari hari dalam bahasa Indonesia memakai CLIP zero shot beserta deteksi otomatis **Tidak yakin**.
+* **Ringan tanpa TensorFlow**: Kedua mode berjalan di satu mesin **ONNX Runtime**, menghemat RAM dan mempercepat proses deploy.
 
-## 📊 Peningkatan Performa & Optimasi
+## 📊 Ilustrasi Data & Performa
 
-| Metrik | Sebelumnya (v6) | Sekarang (v7) | Perubahan |
-| :--- | :---: | :---: | :---: |
-| **Arsitektur CIFAR-10** | ResNet-18 (32×32) | **ViT-Small/16 (224×224)** | Upgrade ke Vision Transformer |
-| **Akurasi Uji CIFAR-10 (10.000 gambar)** | 96,29% (9.629) | **98,42% (9.842)** | **+2,13%** (+213 gambar benar) |
-| **Ukuran Berkas Model** | 45,0 MB (`.h5`) | **22,4 MB (`.onnx` INT8)** | **−50% lebih kecil** |
-| **Mesin Inferensi** | TensorFlow CPU + ONNX | **Unified ONNX Runtime** | **Tanpa TensorFlow** |
-| **Tampilan Inferensi** | 10-view TTA | **1-view (~88 ms/foto)** | Lebih cepat & efisien |
+![Grafik Akurasi dan Ukuran Model](results/accuracy_overview.png)
 
-### Akurasi Uji per Kelas (CIFAR-10 Official Test Set)
-
-| Kelas | Akurasi | Benar / 1.000 | Kelas | Akurasi | Benar / 1.000 |
-| :--- | :---: | :---: | :--- | :---: | :---: |
-| **Frog** | 99,60% | 996 | **Bird** | 98,60% | 986 |
-| **Airplane** | 99,50% | 995 | **Horse** | 98,50% | 985 |
-| **Ship** | 99,40% | 994 | **Truck** | 97,90% | 979 |
-| **Automobile** | 99,10% | 991 | **Dog** | 96,30% | 963 |
-| **Deer** | 99,10% | 991 | **Cat** | 96,20% | 962 |
+<table>
+  <thead>
+    <tr>
+      <th align="left">Metrik</th>
+      <th align="center">Versi v6</th>
+      <th align="center">Versi v7 (Sekarang)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Arsitektur</td>
+      <td align="center">ResNet 18 (32×32)</td>
+      <td align="center"><b>ViT Small/16 (224×224)</b></td>
+    </tr>
+    <tr>
+      <td>Akurasi Uji (10.000 gambar)</td>
+      <td align="center">96,29% (9.629)</td>
+      <td align="center"><b>98,42% (9.842)</b></td>
+    </tr>
+    <tr>
+      <td>Ukuran Berkas Model</td>
+      <td align="center">45,0 MB (<code>.h5</code>)</td>
+      <td align="center"><b>22,4 MB (<code>.onnx</code> INT8)</b></td>
+    </tr>
+    <tr>
+      <td>Mesin Inferensi</td>
+      <td align="center">TensorFlow + ONNX</td>
+      <td align="center"><b>ONNX Runtime</b></td>
+    </tr>
+    <tr>
+      <td>Kecepatan Inferensi</td>
+      <td align="center">10 tampilan (~100 ms)</td>
+      <td align="center"><b>1 tampilan (~88 ms)</b></td>
+    </tr>
+  </tbody>
+</table>
 
 <details>
-<summary>📈 Lihat Confusion Matrix (10.000 Gambar Uji Resmi)</summary>
+<summary>📈 Lihat Confusion Matrix & Bukti Evaluasi</summary>
 
-<br>
+<br />
 
-![CIFAR-10 Confusion Matrix](results/confusion_matrix_tta.png)
+![Confusion Matrix CIFAR 10](results/confusion_matrix_tta.png)
+
+* Metrik JSON lengkap: [`results/metrics.json`](results/metrics.json)
+* Checksum SHA 256: [`results/model_sha256.txt`](results/model_sha256.txt)
+* Ukur ulang secara mandiri: `python scripts/eval_cifar_test.py`
 
 </details>
 
-### Reproduksibilitas & Bukti Evaluasi
-
-Model `model_vit_cifar10.onnx` diekspor dari `MF21377197/vit-small-patch16-224-finetuned-Cifar10` (Apache 2.0, *fine-tuned* pada 45.000 data latih / 5.000 validasi CIFAR-10 tanpa menyentuh himpunan uji), lalu dikuantisasi dinamis ke `QUInt8`.
-
-- 📄 Metrik lengkap JSON: [`results/metrics.json`](results/metrics.json)
-- 🔐 Checksum SHA-256: [`results/model_sha256.txt`](results/model_sha256.txt)
-- 🖼️ Confusion matrix: [`results/confusion_matrix_tta.png`](results/confusion_matrix_tta.png)
-
-Verifikasi ulang angka uji kapan saja pada 10.000 gambar resmi CIFAR-10:
-
-```bash
-python scripts/eval_cifar_test.py
-```
-
----
-
-## 🌍 Cara Kerja Mode Umum
-
-Mode Umum memakai **CLIP ViT-B/32** (INT8 ONNX, ~85 MB) yang diunduh sekali ke cache server dengan verifikasi SHA-256. Embedding teks untuk 256 label sudah tersedia di `data/general_label_embeddings.npz`, sehingga runtime hanya menjalankan *image encoder*.
-
-- Menampilkan **5 tebakan teratas** lengkap dengan nama bahasa Indonesia dan padanan bahasa Inggris.
-- Otomatis menandai **Tidak yakin (not sure)** bila kemiripan tidak jauh lebih tinggi dari *null prompts* (`random`, `abstract`, `blurry`) atau bila dua label teratas hampir seri.
-
----
-
-## 🗂️ Struktur Proyek
-
-```text
-cifar10-app/
-├── app.py                              # Antarmuka Streamlit & pengatur mode
-├── classify.py                         # Praproses & inferensi ONNX CIFAR-10
-├── general.py                          # Inferensi & unduh cache CLIP Mode Umum
-├── general_labels.py                   # 256 label & prompt Mode Umum
-├── model_vit_cifar10.onnx              # Model ViT-Small/16 INT8 ONNX (22,4 MB)
-├── style.css                           # Gaya tampilan kartu hasil & progress bar
-├── data/
-│   └── general_label_embeddings.npz    # Precomputed text embeddings CLIP
-├── results/
-│   ├── metrics.json                    # Akurasi uji resmi & per kelas
-│   ├── model_sha256.txt                # Checksum integritas model ONNX
-│   └── confusion_matrix_tta.png        # Visualisasi confusion matrix
-├── scripts/
-│   └── eval_cifar_test.py              # Skrip evaluasi 10.000 gambar uji CIFAR-10
-├── tests/                              # Unit test, smoke test & Streamlit AppTest
-├── .streamlit/config.toml              # Tema terang & batas unggah 5 MB
-├── .github/workflows/
-│   ├── test.yml                        # CI pytest otomatis
-│   └── verify-model.yml                # Verifikasi akurasi model di GitHub Actions
-├── requirements.txt                    # Dependensi runtime ringan (tanpa TensorFlow)
-├── requirements-dev.txt                # Dependensi runtime + pytest
-└── runtime.txt                         # Python 3.11 (Streamlit Community Cloud)
-```
-
----
-
 ## 🚀 Menjalankan Secara Lokal
-
-Gunakan Python 3.11 (sesuai `runtime.txt`):
 
 ```bash
 python3.11 -m venv .venv
@@ -118,10 +96,6 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Buka URL yang tampil di terminal, pilih mode **CIFAR-10** atau **Umum**, lalu unggah gambar **JPG, PNG, atau WEBP** (maksimal 5 MB).
-
----
-
 ## 🧪 Pengujian
 
 ```bash
@@ -129,28 +103,8 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-Untuk menjalankan uji foto sungguhan Mode Umum (mengunduh model CLIP ~85 MB sekali):
-
-```bash
-GENERAL_LIVE=1 pytest tests/test_general_live.py
-```
-
----
-
-## ☁️ Deployment
-
-Siap langsung di-deploy ke **Streamlit Community Cloud**:
-
-- **Main file path**: `app.py`
-- **Python version**: `3.11` (`runtime.txt`)
-- **Dependencies**: `requirements.txt` (ringan, hanya `onnxruntime` — tanpa TensorFlow)
-- **Upload limit**: 5 MB (`.streamlit/config.toml`)
-
----
-
 ## 🤝 Contributors
 
-- **[@cendysaputra](https://github.com/cendysaputra)** — Project owner & maintainer
-- **Antigravity (Google DeepMind)** — ViT-Small INT8 ONNX upgrade (98,42%), TensorFlow removal, codebase cleanup & documentation
-- **[@claude](https://github.com/claude)** — Earlier CIFAR-10 SWA fine-tuning & Mode Umum implementation
-
+* **[@cendysaputra](https://github.com/cendysaputra)**: Project owner & maintainer
+* **Antigravity (Google DeepMind)**: Upgrade ViT Small INT8 ONNX (98,42%), optimasi runtime, pembersihan kode & dokumentasi
+* **[@claude](https://github.com/claude)**: Implementasi awal SWA & Mode Umum
