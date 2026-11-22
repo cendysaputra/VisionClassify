@@ -1,109 +1,92 @@
 <div align="center">
 
-# Aplikasi Klasifikasi Gambar
+# Image Classification App
 
-Aplikasi web ringan berbasis Streamlit dan ONNX Runtime untuk klasifikasi gambar dengan akurasi uji **98,42%** pada CIFAR 10 serta **256 label** benda sehari hari.
+Lightweight Streamlit and ONNX Runtime web app achieving **98.42%** CIFAR 10 test accuracy plus **256** general object labels.
 
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.59-FF4B4B)
 ![ONNX Runtime](https://img.shields.io/badge/Runtime-ONNX%20INT8-005CED)
-![Test Accuracy](https://img.shields.io/badge/Test%20Accuracy-98.42%25-2EA043)
-![Model Size](https://img.shields.io/badge/Model%20Size-22.4%20MB-6F42C1)
+![Test Accuracy](https://img.shields.io/badge/Accuracy-98.42%25-2EA043)
+![Model Size](https://img.shields.io/badge/Model-22.4%20MB-6F42C1)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
 </div>
 
-## Tampilan Aplikasi
+## Screenshots
 
 <table>
   <tr>
     <td align="center" width="50%">
-      <img src="results/screenshot_cifar10.png" alt="Tampilan Mode CIFAR 10" width="100%" /><br />
-      <sub><b>Mode CIFAR 10</b>: Prediksi 10 kelas dengan ViT Small ONNX (224×224)</sub>
+      <img src="results/screenshot_cifar10.png" alt="CIFAR 10 Mode" width="100%" /><br />
+      <sub><b>CIFAR 10 Mode</b>: ViT Small INT8 ONNX (10 classes)</sub>
     </td>
     <td align="center" width="50%">
-      <img src="results/screenshot_umum.png" alt="Tampilan Mode Umum" width="100%" /><br />
-      <sub><b>Mode Umum</b>: Prediksi 256 label harian dengan CLIP ViT B/32 ONNX</sub>
+      <img src="results/screenshot_umum.png" alt="General Mode" width="100%" /><br />
+      <sub><b>General Mode</b>: CLIP ViT B/32 ONNX (256 labels)</sub>
     </td>
   </tr>
 </table>
 
-## Ringkasan Fitur
+## Performance
 
-* **Mode CIFAR 10**: Mengklasifikasikan 10 kelas (*Airplane, Automobile, Bird, Cat, Deer, Dog, Frog, Horse, Ship, Truck*) dengan akurasi uji resmi **98,42%**.
-* **Mode Umum**: Mengenali 256 benda sehari hari dalam bahasa Indonesia memakai CLIP zero shot beserta deteksi otomatis **Tidak yakin**.
-* **Ringan tanpa TensorFlow**: Kedua mode berjalan di satu mesin **ONNX Runtime**, menghemat RAM dan mempercepat proses deploy.
-
-## Ilustrasi Data & Performa
-
-![Grafik Akurasi dan Ukuran Model](results/accuracy_overview.png)
+![Model Accuracy and Size Overview](results/accuracy_overview.png)
 
 <table>
   <thead>
     <tr>
-      <th align="left">Metrik</th>
-      <th align="center">Versi v6</th>
-      <th align="center">Versi v7 (Sekarang)</th>
+      <th align="left">Metric</th>
+      <th align="center">v6</th>
+      <th align="center">v7 (Current)</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <td>Arsitektur</td>
+      <td>Model</td>
       <td align="center">ResNet 18 (32×32)</td>
       <td align="center"><b>ViT Small/16 (224×224)</b></td>
     </tr>
     <tr>
-      <td>Akurasi Uji (10.000 gambar)</td>
-      <td align="center">96,29% (9.629)</td>
-      <td align="center"><b>98,42% (9.842)</b></td>
+      <td>Test Accuracy (10,000 images)</td>
+      <td align="center">96.29%</td>
+      <td align="center"><b>98.42%</b></td>
     </tr>
     <tr>
-      <td>Ukuran Berkas Model</td>
-      <td align="center">45,0 MB (<code>.h5</code>)</td>
-      <td align="center"><b>22,4 MB (<code>.onnx</code> INT8)</b></td>
+      <td>Model Size</td>
+      <td align="center">45.0 MB (<code>.h5</code>)</td>
+      <td align="center"><b>22.4 MB (<code>.onnx</code>)</b></td>
     </tr>
     <tr>
-      <td>Mesin Inferensi</td>
+      <td>Runtime</td>
       <td align="center">TensorFlow + ONNX</td>
       <td align="center"><b>ONNX Runtime</b></td>
-    </tr>
-    <tr>
-      <td>Kecepatan Inferensi</td>
-      <td align="center">10 tampilan (~100 ms)</td>
-      <td align="center"><b>1 tampilan (~88 ms)</b></td>
     </tr>
   </tbody>
 </table>
 
 <details>
-<summary>Lihat Confusion Matrix & Bukti Evaluasi</summary>
+<summary>Confusion Matrix & Verification</summary>
 
 <br />
 
-![Confusion Matrix CIFAR 10](results/confusion_matrix_tta.png)
+![CIFAR 10 Confusion Matrix](results/confusion_matrix_tta.png)
 
-* Metrik JSON lengkap: [`results/metrics.json`](results/metrics.json)
-* Checksum SHA 256: [`results/model_sha256.txt`](results/model_sha256.txt)
-* Ukur ulang secara mandiri: `python scripts/eval_cifar_test.py`
+* Metrics: [`results/metrics.json`](results/metrics.json)
+* Checksum: [`results/model_sha256.txt`](results/model_sha256.txt)
+* Verify: `python scripts/eval_cifar_test.py`
 
 </details>
 
-## Menjalankan Secara Lokal
+## Quickstart
 
 ```bash
-python3.11 -m venv .venv
-source .venv/bin/activate
+python3.11 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 streamlit run app.py
 ```
 
-## Pengujian
+Run tests with `pip install -r requirements-dev.txt && pytest`.
 
-```bash
-pip install -r requirements-dev.txt
-pytest
-```
+## License
 
-## Lisensi
-
-Proyek ini dirilis di bawah [Lisensi MIT](LICENSE).
+Released under the [MIT License](LICENSE).
