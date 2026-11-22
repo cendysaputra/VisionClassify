@@ -115,7 +115,7 @@ Zero shot CLIP ViT B/16 (INT8 ONNX) on 1,530 CIFAR 100 test images (30 per class
 
 The B/32 column is carried over from the commit that switched to B/16 and was not re measured. The B/16 column is measured one image at a time. The same pack scored differently on different GitHub runners (936 and 930 of 1,530 for 256 label Top 1 in two runs), so differences below about half a point are noise.
 
-The label embeddings in `data/general_label_embeddings.npz` are built by `scripts/build_general_embeddings.py` from the prompts in `general_labels.py`, and the **Verify General mode** workflow commits whatever that script builds. In the same run the previous pack (built outside the repo) scored 930, 1,287 and 1,128 for the three rows, and a seven template ensemble scored 928, 1,286 and 1,121; see [`results/general_comparison.json`](results/general_comparison.json). These differences are within the noise above.
+The label embeddings in `data/general_label_embeddings.npz` are built by `scripts/build_general_embeddings.py` from the prompts in `general_labels.py`, and the **Verify General mode** workflow commits whatever that script builds. In the run that replaced the previous pack (built outside the repo, [run 45029908165](https://github.com/cendysaputra/VisionClassify/actions/runs/45029908165)), that pack scored 930, 1,287 and 1,128 for the three rows, and a seven template ensemble scored 928, 1,286 and 1,121. These differences are within the noise above. Each verify run writes its comparison to [`results/general_comparison.json`](results/general_comparison.json).
 
 * Metrics: [`results/general_metrics.json`](results/general_metrics.json)
 * Verify: `python scripts/eval_general.py`, or the **Verify General mode** workflow
