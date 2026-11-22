@@ -64,18 +64,13 @@ Lightweight Streamlit and ONNX Runtime web app achieving **98.42%** CIFAR 10 tes
   </tbody>
 </table>
 
-<details>
-<summary>Confusion Matrix & Verification</summary>
-
-<br />
+## Confusion Matrix
 
 ![CIFAR 10 Confusion Matrix](results/confusion_matrix_tta.png)
 
 * Metrics: [`results/metrics.json`](results/metrics.json)
 * Checksum: [`results/model_sha256.txt`](results/model_sha256.txt)
 * Verify: `python scripts/eval_cifar_test.py`
-
-</details>
 
 ## Quickstart
 
