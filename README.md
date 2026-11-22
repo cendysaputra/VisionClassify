@@ -1,18 +1,18 @@
 <div align="center">
 
-# 🖼️ Aplikasi Klasifikasi Gambar
+# Aplikasi Klasifikasi Gambar
 
 Aplikasi web ringan berbasis Streamlit dan ONNX Runtime untuk klasifikasi gambar dengan akurasi uji **98,42%** pada CIFAR 10 serta **256 label** benda sehari hari.
 
-![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
-![Streamlit](https://img.shields.io/badge/Streamlit-1.59-FF4B4B?logo=streamlit&logoColor=white)
-![ONNX Runtime](https://img.shields.io/badge/Runtime-ONNX%20INT8-005CED?logo=onnx&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.11-3776AB)
+![Streamlit](https://img.shields.io/badge/Streamlit-1.59-FF4B4B)
+![ONNX Runtime](https://img.shields.io/badge/Runtime-ONNX%20INT8-005CED)
 ![Test Accuracy](https://img.shields.io/badge/Test%20Accuracy-98.42%25-2EA043)
 ![Model Size](https://img.shields.io/badge/Model%20Size-22.4%20MB-6F42C1)
 
 </div>
 
-## 📸 Tampilan Aplikasi
+## Tampilan Aplikasi
 
 <table>
   <tr>
@@ -27,13 +27,13 @@ Aplikasi web ringan berbasis Streamlit dan ONNX Runtime untuk klasifikasi gambar
   </tr>
 </table>
 
-## ✨ Ringkasan Fitur
+## Ringkasan Fitur
 
 * **Mode CIFAR 10**: Mengklasifikasikan 10 kelas (*Airplane, Automobile, Bird, Cat, Deer, Dog, Frog, Horse, Ship, Truck*) dengan akurasi uji resmi **98,42%**.
 * **Mode Umum**: Mengenali 256 benda sehari hari dalam bahasa Indonesia memakai CLIP zero shot beserta deteksi otomatis **Tidak yakin**.
 * **Ringan tanpa TensorFlow**: Kedua mode berjalan di satu mesin **ONNX Runtime**, menghemat RAM dan mempercepat proses deploy.
 
-## 📊 Ilustrasi Data & Performa
+## Ilustrasi Data & Performa
 
 ![Grafik Akurasi dan Ukuran Model](results/accuracy_overview.png)
 
@@ -75,7 +75,7 @@ Aplikasi web ringan berbasis Streamlit dan ONNX Runtime untuk klasifikasi gambar
 </table>
 
 <details>
-<summary>📈 Lihat Confusion Matrix & Bukti Evaluasi</summary>
+<summary>Lihat Confusion Matrix & Bukti Evaluasi</summary>
 
 <br />
 
@@ -87,7 +87,7 @@ Aplikasi web ringan berbasis Streamlit dan ONNX Runtime untuk klasifikasi gambar
 
 </details>
 
-## 🚀 Menjalankan Secara Lokal
+## Menjalankan Secara Lokal
 
 ```bash
 python3.11 -m venv .venv
@@ -96,7 +96,7 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-## 🧪 Pengujian
+## Pengujian
 
 ```bash
 pip install -r requirements-dev.txt
