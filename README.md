@@ -71,7 +71,7 @@ The two models are not trained the same way: v7 starts from weights pretrained o
 
 **Source.** v7 is [`MF21377197/vit-small-patch16-224-finetuned-Cifar10`](https://huggingface.co/MF21377197/vit-small-patch16-224-finetuned-Cifar10) (Apache 2.0), a 3 epoch fine tune of [`WinKawaks/vit-small-patch16-224`](https://huggingface.co/WinKawaks/vit-small-patch16-224), exported to ONNX and quantized to INT8. Its training log ([`results/provenance/`](results/provenance/)) shows 351 steps of 128 images per epoch and a 5,000 image evaluation set, so it trained on 45,000 training images and chose its checkpoint on the other 5,000. The 10,000 test images were not part of either.
 
-**Batch effect.** The INT8 model quantizes activations per batch, so a prediction can change with the other images in the same batch. The app classifies one image per call, and the accuracy above is measured the same way. Batched runs gave 9,836 to 9,843.
+**Batch effect.** The INT8 model quantizes activations per batch, so a prediction can change with the other images in the same batch. The app classifies one image per call, and the accuracy above is measured the same way. Batched runs gave 9,836 to 9,843. INT8 kernels also differ between CPU types, so another machine can differ by a few images.
 
 * Metrics: [`results/metrics.json`](results/metrics.json)
 * Checksum: [`results/model_sha256.txt`](results/model_sha256.txt)
@@ -93,12 +93,12 @@ Zero shot CLIP ViT B/16 (INT8 ONNX) on 1,530 CIFAR 100 test images (30 per class
     <tr>
       <td align="left">256 Label Top 1</td>
       <td align="left">55.03%</td>
-      <td align="left"><b>61.18%</b></td>
+      <td align="left"><b>60.78%</b></td>
     </tr>
     <tr>
       <td align="left">51 Class Top 1</td>
       <td align="left">70.92%</td>
-      <td align="left"><b>74.31%</b></td>
+      <td align="left"><b>73.73%</b></td>
     </tr>
     <tr>
       <td align="left">256 Label Top 5</td>
@@ -113,7 +113,7 @@ Zero shot CLIP ViT B/16 (INT8 ONNX) on 1,530 CIFAR 100 test images (30 per class
   </tbody>
 </table>
 
-The B/32 column is carried over from the commit that switched to B/16 and was not re measured. The B/16 column is measured one image at a time.
+The B/32 column is carried over from the commit that switched to B/16 and was not re measured. The B/16 column is measured one image at a time. Two runs on different GitHub runners gave 936 and 930 of 1,530 for 256 label Top 1, so differences below about half a point are noise.
 
 The label embeddings in `data/general_label_embeddings.npz` are built by `scripts/build_general_embeddings.py` from the prompts in `general_labels.py`. A template ensemble was tried and scored lower on every metric, so each label keeps its written prompts. Labels and prompts were compared on this same benchmark, so its numbers may be slightly optimistic.
 
