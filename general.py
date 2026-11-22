@@ -15,19 +15,19 @@ from PIL import Image
 from classify import Prediction, RankedClass
 from general_labels import LABELS, NULL_PROMPTS, label_by_id
 
-VISION_FILENAME = "clip-vit-b32-vision-int8.onnx"
+VISION_FILENAME = "clip-vit-b16-vision-int8.onnx"
 VISION_URL = (
-    "https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/"
-    "d15189d7028b43f1d3e65039190477f6af591c2a/onnx/vision_model_quantized.onnx"
+    "https://huggingface.co/Xenova/clip-vit-base-patch16/resolve/"
+    "342fdf2f67aded64d138ff074745fb4a5d2bba5f/onnx/vision_model_quantized.onnx"
 )
-VISION_SHA256 = "583fd1110a514667812fee7d684952aaf82a99b959760c8d7dca7e0ab9839299"
-VISION_BYTES = 89_117_001
+VISION_SHA256 = "44eece4fe5fe4e0359a88268a327adf758633a1aade3917690b952bef1501f96"
+VISION_BYTES = 87_461_602
 EMBEDDINGS_FILENAME = "general_label_embeddings.npz"
-BACKEND_ID = "clip-vit-b32-int8-583fd111"
+BACKEND_ID = "clip-vit-b16-int8-44eece4f"
 LOGIT_SCALE = 100.0
 # Confidence thresholds
 NULL_MARGIN = 0.022
-MIN_LABEL_GAP = 0.006
+MIN_LABEL_GAP = 0.005
 INPUT_SIZE = 224
 _MAX_SIDE = 768
 _MAX_ASPECT = 3
