@@ -3,7 +3,7 @@
 Not part of the Streamlit runtime. Needs onnxruntime, tokenizers and numpy:
 
     pip install onnxruntime tokenizers numpy
-    python scripts/build_general_embeddings.py --templates ensemble
+    python scripts/build_general_embeddings.py
 
 The CLIP ViT-B/16 text encoder and tokenizer are downloaded from a pinned
 Hugging Face revision (the same revision as the vision encoder in general.py),
@@ -13,7 +13,9 @@ One embedding row is written per prompt in general_labels.prompt_texts(), so
 the row layout always matches the code. With --templates ensemble, a label
 without hand-written prompts gets the mean of several template sentences in
 its single row (prompt ensembling, Radford et al. 2021). Hand-written prompts
-are embedded as written.
+are embedded as written. The committed pack uses --templates single: on the
+benchmark in scripts/eval_general.py it beat both the earlier ensembled pack
+and this ensemble on every metric (results/general_metrics.json).
 """
 
 from __future__ import annotations
@@ -127,7 +129,7 @@ def _embed(session: object, tokenizer: object, prompts: list[str], batch: int = 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--templates", choices=("single", "ensemble"), default="ensemble")
+    parser.add_argument("--templates", choices=("single", "ensemble"), default="single")
     parser.add_argument("--output", default=str(OUTPUT))
     args = parser.parse_args()
 

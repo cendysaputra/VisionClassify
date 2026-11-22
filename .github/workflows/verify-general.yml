@@ -2,9 +2,10 @@ name: Verify General mode
 
 # Rebuild the General mode label embeddings with scripts/build_general_embeddings.py,
 # compare them with the committed pack, and score committed and rebuilt packs on the
-# CIFAR-100 benchmark in scripts/eval_general.py. If the rebuilt ensemble pack scores
-# at least as well as the committed one, it replaces the committed pack, so the file
-# in git can always be regenerated from code. Runs on branches other than main.
+# CIFAR-100 benchmark in scripts/eval_general.py. The pack built with the script's
+# default templates replaces the committed one when it scores at least as well on
+# every metric, so the file in git can be regenerated from code. Runs on branches
+# other than main.
 on:
   workflow_dispatch:
   push:
@@ -82,14 +83,15 @@ jobs:
               text = open(path).read()
               return tuple(int(re.search(rf"{key}\s*: (\d+)/", text).group(1))
                            for key in ("256-way Top-1", "256-way Top-5", "51-way Top-1"))
-          old, new = scores("committed.txt"), scores("ensemble.txt")
-          print("committed", old, "rebuilt ensemble", new)
+          old = scores("committed.txt")
+          print("committed", old, "single", scores("single.txt"), "ensemble", scores("ensemble.txt"))
+          new = scores("single.txt")
           if all(n >= o for n, o in zip(new, old)):
-              shutil.copyfile("rebuilt/ensemble.npz", "data/general_label_embeddings.npz")
-              print("replacing committed pack with the rebuilt ensemble pack")
+              shutil.copyfile("rebuilt/single.npz", "data/general_label_embeddings.npz")
+              print("using the pack built with the default (single) templates")
           PY
-          if ! git diff --quiet -- data/general_label_embeddings.npz; then
-            python scripts/eval_general.py --write-results
+          python scripts/eval_general.py --write-results
+          if ! git diff --quiet -- data/general_label_embeddings.npz results/general_metrics.json; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add data/general_label_embeddings.npz results/general_metrics.json
