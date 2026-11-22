@@ -1,8 +1,4 @@
-"""Daftar label mode Umum.
-
-Prompt bahasa Inggris dipakai CLIP. Nama yang tampil di aplikasi bahasa Indonesia.
-Embedding teks untuk prompt ini ada di data/general_label_embeddings.npz.
-"""
+"""General mode labels."""
 
 from __future__ import annotations
 
@@ -18,8 +14,7 @@ class GeneralLabel:
     prompts: tuple[str, ...] = ()
 
 
-# Kalimat kosong memakai satu prompt bawaan. Label di bawah ini punya beberapa
-# prompt karena itu yang membedakan orang, rumah, dan batu pada foto sungguhan.
+# Custom label prompts
 SPECIAL_PROMPTS: dict[str, tuple[str, ...]] = {
     "person": (
         "a photo of a person.",
@@ -65,7 +60,7 @@ SPECIAL_PROMPTS: dict[str, tuple[str, ...]] = {
     ),
 }
 
-# Bukan label. Dipakai untuk menandai gambar yang tidak mirip apa pun.
+# Fallback null prompts
 NULL_PROMPTS: tuple[str, ...] = (
     "a random image.",
     "an abstract image.",
@@ -350,7 +345,7 @@ def _article(name: str) -> str:
 
 
 def prompt_texts(label: GeneralLabel) -> tuple[str, ...]:
-    """Kalimat CLIP untuk satu label. Label khusus tidak memakai prompt bawaan."""
+    """Build CLIP prompts."""
     if label.prompts:
         return label.prompts
     article = _article(label.name_en)

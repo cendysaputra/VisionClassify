@@ -8,6 +8,6 @@ venv/
 .DS_Store
 *.log
 *.onnx
+!model_vit_cifar10.onnx
 *.part
 data/
-checkpoints/

@@ -1,3 +1,0 @@
-# Hanya untuk train.py. Aplikasi Streamlit tidak membutuhkan PyTorch.
---extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.15.0+cpu

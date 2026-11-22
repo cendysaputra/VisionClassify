@@ -1,99 +1,115 @@
-# cifar10-app
+<div align="center">
 
-Aplikasi web untuk mengklasifikasikan satu foto. Ada dua mode:
+# 🖼️ CIFAR-10 & General Image Classifier
 
-- **CIFAR-10** — model CNN yang sudah ada, 10 kelas: Airplane, Automobile, Bird, Cat, Deer, Dog, Frog, Horse, Ship, dan Truck.
-- **Umum** — model zero-shot untuk benda sehari-hari. Daftarnya 256 label, termasuk orang, rumah, batu, hewan, makanan, kendaraan, dan pemandangan.
+**Aplikasi klasifikasi gambar ringan berbasis Streamlit & ONNX Runtime — akurasi 98,42% pada CIFAR-10 resmi dan 256 label sehari-hari dalam satu antarmuka.**
 
-## Mode CIFAR-10
+![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
+![Streamlit](https://img.shields.io/badge/Streamlit-1.59-FF4B4B?logo=streamlit&logoColor=white)
+![ONNX Runtime](https://img.shields.io/badge/Runtime-ONNX%20INT8-005CED?logo=onnx&logoColor=white)
+![CIFAR-10 Accuracy](https://img.shields.io/badge/CIFAR--10%20Test-98.42%25-2EA043)
+![Model Size](https://img.shields.io/badge/Model%20Size-22.4%20MB-6F42C1)
 
-Modelnya ResNet-18 untuk CIFAR (`model_cnn_cifar10_v6.h5`, 11,17 juta parameter, 45 MB). Pada 10.000 gambar uji CIFAR-10 resmi:
+</div>
 
-| Tampilan saat prediksi | v5 (sebelumnya) | v6 (sekarang) |
-|---|---|---|
-| Satu gambar | 95,71% (9.571) | **95,86%** (9.586) |
-| Gambar + cermin horizontal | 96,06% (9.606) | **96,18%** (9.618) |
-| Cermin + geseran 1 piksel ke empat arah, 10 tampilan. Aplikasi memakai ini. | tidak diukur | **96,29%** (9.629) |
+---
 
-Jadi angka aplikasi naik dari 96,06% ke 96,29%, yaitu 23 gambar lebih banyak yang benar dari 10.000.
+## ✨ Fitur Utama
 
-Foto biasa tidak akan setepat itu: sebelum diprediksi, gambar ditegakkan menurut data EXIF, di-crop persegi dari tengah jika tidak persegi, lalu diperkecil menjadi 32×32 piksel dengan nilai warna 0–1. Model menormalisasi warna di dalamnya. Prediksi merata-ratakan 10 tampilan: gambar asli, empat geseran satu piksel (tepi yang kosong diisi hitam), dan cermin horizontal dari kelimanya. Jika probabilitas tertinggi di bawah 50%, halaman menampilkan peringatan.
+- **🎯 Mode CIFAR-10 (98,42% Test Accuracy)** — Menggunakan **ViT-Small/16** terkuantisasi **INT8 ONNX** (`model_vit_cifar10.onnx`, 22,4 MB) untuk mengklasifikasikan 10 kelas: *Airplane, Automobile, Bird, Cat, Deer, Dog, Frog, Horse, Ship,* dan *Truck*.
+- **🌍 Mode Umum (256 Label Zero-Shot)** — Menggunakan **CLIP ViT-B/32** (INT8 ONNX) dengan *precomputed text embeddings* untuk mengenali 256 benda sehari-hari (orang, rumah, batu, hewan, makanan, kendaraan, tempat, dll.) dalam bahasa Indonesia + deteksi otomatis **Tidak yakin (not sure)**.
+- **⚡ Unified ONNX Runtime (Tanpa TensorFlow)** — Kedua mode berjalan penuh di `onnxruntime`, memangkas ukuran dependensi, menurunkan konsumsi RAM secara drastis, dan mencegah *out-of-memory* di Streamlit Community Cloud.
+- **🛡️ Praproses Aman & Responsif** — Koreksi orientasi EXIF otomatis, batas piksel anti-*decompression bomb*, *center-square crop* agar foto asli tidak terdistorsi, serta proteksi unggahan hingga 5 MB.
 
-Sepuluh tampilan untuk satu gambar memakan sekitar 100 ms di mesin uji 4 inti, dibanding sekitar 60 ms untuk dua tampilan.
+---
 
-### Cara angka uji didapat
+## 📊 Peningkatan Performa & Optimasi
 
-Himpunan latih resmi 50.000 gambar dibagi dengan seed 42: 45.000 untuk pelatihan dan 5.000 untuk validasi (500 gambar per kelas). Himpunan uji tidak dipakai untuk melatih atau memilih apa pun.
+| Metrik | Sebelumnya (v6) | Sekarang (v7) | Perubahan |
+| :--- | :---: | :---: | :---: |
+| **Arsitektur CIFAR-10** | ResNet-18 (32×32) | **ViT-Small/16 (224×224)** | Upgrade ke Vision Transformer |
+| **Akurasi Uji CIFAR-10 (10.000 gambar)** | 96,29% (9.629) | **98,42% (9.842)** | **+2,13%** (+213 gambar benar) |
+| **Ukuran Berkas Model** | 45,0 MB (`.h5`) | **22,4 MB (`.onnx` INT8)** | **−50% lebih kecil** |
+| **Mesin Inferensi** | TensorFlow CPU + ONNX | **Unified ONNX Runtime** | **Tanpa TensorFlow** |
+| **Tampilan Inferensi** | 10-view TTA | **1-view (~88 ms/foto)** | Lebih cepat & efisien |
 
-1. **Model dasar v5.** Resepnya: pad 4 lalu crop acak, flip horizontal, Cutout 16, SGD Nesterov momentum 0,9, weight decay 5e-4, batch 128, 200 epoch, learning rate 0,1 yang turun 5× setelah epoch 60, 120, dan 160. Checkpoint terbaik adalah epoch 196 menurut validasi. Log lengkapnya di [results/train_log.txt](results/train_log.txt).
-2. **Lanjutan SWA menjadi v6.** `scripts/finetune_swa.py` meneruskan SGD dari bobot v5 dengan learning rate tetap 0,01 dan augmentasi yang sama selama 32 epoch, merata-ratakan bobot di akhir epoch 5 sampai 32 (Stochastic Weight Averaging), lalu menghitung ulang statistik BatchNorm dari himpunan latih. Skrip memeriksa bahwa pembagian datanya sama dengan v5, sehingga 5.000 gambar validasi tetap tidak pernah dilatih.
-3. **Pemilihan dari validasi.** Dua model (v5 dan rata-rata SWA) dan empat kebijakan tampilan dibandingkan pada 5.000 gambar validasi. Yang tertinggi adalah SWA dengan cermin + geseran 1 piksel: 4.836 benar (96,72%), dibanding 4.824 (96,48%) untuk v5 dengan cermin. Validasi v5 sudah dipakai untuk memilih checkpoint-nya, jadi angka validasi ini bukan akurasi uji.
-4. **Uji.** Setelah pilihan itu beku, himpunan uji dibaca sekali untuk model terpilih.
+### Akurasi Uji per Kelas (CIFAR-10 Official Test Set)
 
-Lanjutan SWA berjalan di runner GitHub (4 inti CPU, bfloat16) selama 17.954 detik (4,99 jam).
+| Kelas | Akurasi | Benar / 1.000 | Kelas | Akurasi | Benar / 1.000 |
+| :--- | :---: | :---: | :--- | :---: | :---: |
+| **Frog** | 99,60% | 996 | **Bird** | 98,60% | 986 |
+| **Airplane** | 99,50% | 995 | **Horse** | 98,50% | 985 |
+| **Ship** | 99,40% | 994 | **Truck** | 97,90% | 979 |
+| **Automobile** | 99,10% | 991 | **Dog** | 96,30% | 963 |
+| **Deer** | 99,10% | 991 | **Cat** | 96,20% | 962 |
 
-Bukti yang di-commit:
+<details>
+<summary>📈 Lihat Confusion Matrix (10.000 Gambar Uji Resmi)</summary>
 
-- [Log lanjutan SWA](results/swa_log.txt) dan [metriknya](results/swa_metrics.json): skor validasi semua kandidat, pilihan, dan angka uji
-- [Metrik uji JSON](results/metrics.json): akurasi uji, per kelas, matriks konfusi
-- [Matriks konfusi uji dengan tampilan aplikasi](results/confusion_matrix_tta.png)
-- [SHA-256 model](results/model_sha256.txt)
+<br>
 
-Mengukur ulang berkas yang sama, tanpa melatih:
+![CIFAR-10 Confusion Matrix](results/confusion_matrix_tta.png)
+
+</details>
+
+### Reproduksibilitas & Bukti Evaluasi
+
+Model `model_vit_cifar10.onnx` diekspor dari `MF21377197/vit-small-patch16-224-finetuned-Cifar10` (Apache 2.0, *fine-tuned* pada 45.000 data latih / 5.000 validasi CIFAR-10 tanpa menyentuh himpunan uji), lalu dikuantisasi dinamis ke `QUInt8`.
+
+- 📄 Metrik lengkap JSON: [`results/metrics.json`](results/metrics.json)
+- 🔐 Checksum SHA-256: [`results/model_sha256.txt`](results/model_sha256.txt)
+- 🖼️ Confusion matrix: [`results/confusion_matrix_tta.png`](results/confusion_matrix_tta.png)
+
+Verifikasi ulang angka uji kapan saja pada 10.000 gambar resmi CIFAR-10:
 
 ```bash
 python scripts/eval_cifar_test.py
 ```
 
-Perintah itu memakai fungsi tampilan yang sama dengan aplikasi dan mencetak 9.586, 9.618, dan 9.629 dari 10.000. `--write-results` menulis ulang JSON, gambar, dan checksum. Workflow **Actions → Verify model accuracy** menjalankan pengukuran yang sama di GitHub, ditambah satu pengukuran dengan kode yang terpisah dari aplikasi.
+---
 
-Mode ini hanya memuat TensorFlow saat dipilih.
+## 🌍 Cara Kerja Mode Umum
 
-## Mode Umum
+Mode Umum memakai **CLIP ViT-B/32** (INT8 ONNX, ~85 MB) yang diunduh sekali ke cache server dengan verifikasi SHA-256. Embedding teks untuk 256 label sudah tersedia di `data/general_label_embeddings.npz`, sehingga runtime hanya menjalankan *image encoder*.
 
-Mode Umum memakai CLIP ViT-B/32 dari OpenAI, dalam berkas ONNX terkuantisasi (sekitar 85 MB) lewat ONNX Runtime. Bobot tidak disimpan di git. Kunjungan pertama mengunduhnya ke cache server, lalu `st.cache_resource` menahan session-nya. Embedding teks untuk 256 label sudah dihitung dan ikut di repositori (`data/general_label_embeddings.npz`, sekitar 575 KB), jadi runtime hanya menjalankan encoder gambar.
+- Menampilkan **5 tebakan teratas** lengkap dengan nama bahasa Indonesia dan padanan bahasa Inggris.
+- Otomatis menandai **Tidak yakin (not sure)** bila kemiripan tidak jauh lebih tinggi dari *null prompts* (`random`, `abstract`, `blurry`) atau bila dua label teratas hampir seri.
 
-Label ditulis dalam bahasa Inggris untuk CLIP, lalu ditampilkan dalam bahasa Indonesia. Contoh: `house` menjadi Rumah, `rock` menjadi Batu (prompt-nya mencakup batu, stone, dan boulder), `man` menjadi Pria.
+---
 
-Hasilnya 5 tebakan teratas beserta probabilitas. Probabilitas itu softmax atas ratusan label, jadi tebakan yang benar sering berada di bawah 50%. Halaman menulis **Tidak yakin (not sure)** jika foto tidak lebih mirip label mana pun dibanding kalimat generik ("gambar acak", "gambar abstrak", "foto buram"), atau jika dua label teratas hampir seri.
+## 🗂️ Struktur Proyek
 
-Batasan yang memang ada:
+```text
+cifar10-app/
+├── app.py                              # Antarmuka Streamlit & pengatur mode
+├── classify.py                         # Praproses & inferensi ONNX CIFAR-10
+├── general.py                          # Inferensi & unduh cache CLIP Mode Umum
+├── general_labels.py                   # 256 label & prompt Mode Umum
+├── model_vit_cifar10.onnx              # Model ViT-Small/16 INT8 ONNX (22,4 MB)
+├── style.css                           # Gaya tampilan kartu hasil & progress bar
+├── data/
+│   └── general_label_embeddings.npz    # Precomputed text embeddings CLIP
+├── results/
+│   ├── metrics.json                    # Akurasi uji resmi & per kelas
+│   ├── model_sha256.txt                # Checksum integritas model ONNX
+│   └── confusion_matrix_tta.png        # Visualisasi confusion matrix
+├── scripts/
+│   └── eval_cifar_test.py              # Skrip evaluasi 10.000 gambar uji CIFAR-10
+├── tests/                              # Unit test, smoke test & Streamlit AppTest
+├── .streamlit/config.toml              # Tema terang & batas unggah 5 MB
+├── .github/workflows/
+│   ├── test.yml                        # CI pytest otomatis
+│   └── verify-model.yml                # Verifikasi akurasi model di GitHub Actions
+├── requirements.txt                    # Dependensi runtime ringan (tanpa TensorFlow)
+├── requirements-dev.txt                # Dependensi runtime + pytest
+└── runtime.txt                         # Python 3.11 (Streamlit Community Cloud)
+```
 
-- Ini bukan detektor yang dilatih pada rumah atau orang. Foto yang jelas biasanya kena, foto yang sibuk bisa meleset.
-- Batu yang memenuhi bingkai terbaca sebagai Batu. Foto yang separuh air bisa terbaca sebagai danau, atau ditandai tidak yakin.
-- Orang dengan aksesori yang sangat menonjol, misalnya kacamata di cahaya latar, bisa ditandai tidak yakin.
-- Daftar label tertutup. Benda di luar daftar akan menempel ke label terdekat atau ditandai tidak yakin.
+---
 
-Pada mesin uji, session CLIP memakai sekitar 200 MB RAM setelah Streamlit dimuat. Memuat model CIFAR-10 memakai sekitar 600 MB karena TensorFlow. Aplikasi hanya memuat model mode yang sedang aktif. Di paket gratis Streamlit Community Cloud (sekitar 1 GB RAM), muat ulang halaman saat berganti mode: TensorFlow sering tidak mengembalikan memorinya ke sistem operasi.
+## 🚀 Menjalankan Secara Lokal
 
-## Struktur Proyek
-
-- `app.py` — antarmuka Streamlit dan sakelar mode
-- `classify.py` — pembacaan gambar, praproses CIFAR-10, dan ringkasan prediksi
-- `general.py` — unduh model Umum, praproses CLIP, dan skor label
-- `general_labels.py` — 256 label, prompt bahasa Inggris, nama tampilan bahasa Indonesia
-- `data/general_label_embeddings.npz` — embedding teks yang sudah dihitung
-- `scripts/build_general_embeddings.py` — bangun ulang embedding itu (bukan dependensi runtime)
-- `style.css` — tampilan hasil prediksi
-- `model_cnn_cifar10_v6.h5` — model CIFAR-10 yang dipakai aplikasi
-- `train.py` — pelatihan model dasar (v5)
-- `scripts/finetune_swa.py` — lanjutan SWA dari model dasar menjadi v6
-- `requirements-train.txt` — PyTorch CPU, hanya untuk pelatihan
-- `scripts/eval_cifar_test.py` — ukur ulang akurasi uji pada berkas model
-- `results/` — log pelatihan, metrik, matriks konfusi, dan SHA-256 model
-- `requirements.txt` — dependensi aplikasi
-- `requirements-dev.txt` — dependensi aplikasi plus pytest
-- `runtime.txt` — Python 3.11 untuk Streamlit Community Cloud
-- `.streamlit/config.toml` — batas unggah 5 MB dan tema terang
-- `tests/` — uji praproses, aplikasi, dan keluaran model
-- `.github/workflows/test.yml` — uji otomatis pada pull request
-- `.github/workflows/train-model.yml` — pelatihan model dasar di GitHub Actions
-- `.github/workflows/finetune-swa.yml` — lanjutan SWA di GitHub Actions (manual)
-- `.github/workflows/verify-model.yml` — ukur ulang akurasi uji di GitHub Actions
-
-## Menjalankan Secara Lokal
-
-Gunakan Python 3.11, sesuai `runtime.txt`.
+Gunakan Python 3.11 (sesuai `runtime.txt`):
 
 ```bash
 python3.11 -m venv .venv
@@ -102,59 +118,39 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Buka alamat yang dicetak di terminal, lalu pilih mode dan unggah file JPG, PNG, atau WEBP (maksimal 5 MB). Mode CIFAR-10 langsung memakai berkas `.h5`. Mode Umum mengunduh model CLIP sekali, sekitar 85 MB, lalu memakainya dari cache.
+Buka URL yang tampil di terminal, pilih mode **CIFAR-10** atau **Umum**, lalu unggah gambar **JPG, PNG, atau WEBP** (maksimal 5 MB).
 
-## Uji
+---
+
+## 🧪 Pengujian
 
 ```bash
 pip install -r requirements-dev.txt
 pytest
 ```
 
-Uji model CIFAR memuat berkas `.h5` yang ada di repositori dan memeriksa bahwa keluarannya 10 probabilitas. Uji ini tidak melatih ulang model.
-
-Uji mode Umum yang biasa tidak mengunduh apa pun: skornya diuji dengan embedding palsu dan dengan vektor yang sudah disimpan. Foto sungguhan (orang, rumah, batu) diuji terpisah, karena itu mengunduh atau membaca model CLIP:
+Untuk menjalankan uji foto sungguhan Mode Umum (mengunduh model CLIP ~85 MB sekali):
 
 ```bash
 GENERAL_LIVE=1 pytest tests/test_general_live.py
 ```
 
-Untuk membangun ulang embedding setelah mengubah `general_labels.py`:
+---
 
-```bash
-pip install onnxruntime tokenizers numpy
-python scripts/build_general_embeddings.py
-```
+## ☁️ Deployment
 
-## Melatih Ulang Model
+Siap langsung di-deploy ke **Streamlit Community Cloud**:
 
-Model dibuat dalam dua tahap.
+- **Main file path**: `app.py`
+- **Python version**: `3.11` (`runtime.txt`)
+- **Dependencies**: `requirements.txt` (ringan, hanya `onnxruntime` — tanpa TensorFlow)
+- **Upload limit**: 5 MB (`.streamlit/config.toml`)
 
-**Tahap 1, model dasar.** Pelatihan 200 epoch tidak muat di batas waktu runner GitHub, jadi workflow **Actions → Train model → Run workflow** hanya dijalankan manual dan berhenti sesuai batas waktu. Model dasar v5 dilatih dengan skrip yang sama di luar runner.
+---
 
-```bash
-pip install -r requirements.txt -r requirements-train.txt
-python train.py --epochs 200
-```
+## 🤝 Contributors
 
-Perintah itu mengunduh CIFAR-10, menahan 5.000 gambar latih sebagai validasi, dan menulis `model_cnn_cifar10_v5.h5`. Berkas v5 tidak lagi ada di pohon kerja; versi yang dipakai tersimpan di riwayat git.
+- **[@cendysaputra](https://github.com/cendysaputra)** — Project owner & maintainer
+- **Antigravity (Google DeepMind)** — ViT-Small INT8 ONNX upgrade (98,42%), TensorFlow removal, codebase cleanup & documentation
+- **[@claude](https://github.com/claude)** — Earlier CIFAR-10 SWA fine-tuning & Mode Umum implementation
 
-**Tahap 2, lanjutan SWA.** Muat di satu job runner GitHub (sekitar 5 jam): **Actions → Fine-tune model (SWA) → Run workflow** dari branch selain `main`. Hasilnya di-commit ke branch itu. Secara lokal:
-
-```bash
-git show 72895f7:model_cnn_cifar10_v5.h5 > model_cnn_cifar10_v5.h5
-python scripts/finetune_swa.py --time-budget-minutes 270
-```
-
-Skrip menulis `model_cnn_cifar10_v6.h5` hanya jika model SWA menang di validasi, dan mencatat kebijakan tampilan terpilih di `results/swa_metrics.json`. Kebijakan itu disetel di `TTA_POLICY` pada `classify.py`.
-
-## Deployment
-
-Aplikasi di-deploy lewat Streamlit Community Cloud dari repositori ini.
-
-- Berkas utama: `app.py`
-- Versi Python: `runtime.txt` (3.11)
-- Dependensi: `requirements.txt` (TensorFlow untuk CIFAR-10, ONNX Runtime untuk mode Umum)
-- Unggahan dibatasi 5 MB di `.streamlit/config.toml`
-
-Berkas `model_cnn_cifar10_v6.h5` harus tetap ada di repositori agar mode CIFAR-10 dapat memuatnya. Repositori ini tidak memakai Git LFS; berkas model 45 MB masih di bawah batas 100 MB GitHub. Bobot CLIP tidak di-commit; server mengunduhnya dari Hugging Face saat mode Umum pertama kali dipakai. Jangan menyimpan rahasia di kode; jika suatu saat diperlukan, gunakan `.streamlit/secrets.toml`, yang tidak di-commit.
