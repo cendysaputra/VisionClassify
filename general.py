@@ -48,7 +48,7 @@ def cache_dir() -> Path:
     override = os.environ.get("GENERAL_MODEL_CACHE")
     if override:
         return Path(override)
-    return Path.home() / ".cache" / "cifar10-app"
+    return Path.home() / ".cache" / "VisionClassify"
 
 
 def vision_model_path() -> Path:
@@ -69,7 +69,7 @@ def _file_sha256(path: Path) -> str:
 
 
 def _download(url: str, dest: Path) -> None:
-    request = urllib.request.Request(url, headers={"User-Agent": "cifar10-app/1.0"})
+    request = urllib.request.Request(url, headers={"User-Agent": "VisionClassify/1.0"})
     try:
         with urllib.request.urlopen(request, timeout=60) as response, dest.open("wb") as handle:
             while True:

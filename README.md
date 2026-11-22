@@ -1,4 +1,4 @@
-# Image Classification App
+# VisionClassify
 
 Lightweight Streamlit and ONNX Runtime web app achieving **98.42%** CIFAR 10 test accuracy and **82.94%** Top 5 accuracy across **256** general object labels.
 
