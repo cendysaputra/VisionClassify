@@ -76,7 +76,8 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-dir", default=str(ROOT / "data"))
     parser.add_argument("--per-class", type=int, default=30)
-    parser.add_argument("--batch-size", type=int, default=32)
+    # Batch size 1 like the app: the INT8 vision model quantizes per batch.
+    parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--embeddings", default=None,
                         help="Score another label embedding pack instead of the committed one.")
     parser.add_argument("--write-results", action="store_true")
@@ -149,6 +150,7 @@ def main() -> None:
         "classes": len(subset_indices),
         "total_labels": len(LABELS),
         "images_evaluated": total,
+        "batch_size": args.batch_size,
         "model_architecture": "CLIP ViT-B/16 (INT8 ONNX) + Prompt Ensemble",
         "model_sha256": general.VISION_SHA256,
         "model_bytes": general.VISION_BYTES,

@@ -76,14 +76,13 @@ jobs:
           session = ort.InferenceSession(path, providers=["CPUExecutionProvider"])
           name = session.get_inputs()[0].name
           size = session.get_inputs()[0].shape[-1]
+          # One image per call, as in the app: INT8 activations are quantized per batch.
           correct = 0
-          for start in range(0, len(x), 100):
-              chunk = [np.asarray(Image.fromarray(im).resize((size, size), Image.BILINEAR), np.float32)
-                       for im in x[start : start + 100]]
-              batch = ((np.stack(chunk) / 255.0 - 0.5) / 0.5).transpose(0, 3, 1, 2).astype(np.float32)
-              logits = session.run(None, {name: batch})[0]
-              correct += int((logits.argmax(1) == y[start : start + 100]).sum())
-          print(f"independent single: {correct}/10000")
+          for image, label in zip(x, y):
+              pixels = np.asarray(Image.fromarray(image).resize((size, size), Image.BILINEAR), np.float32)
+              batch = ((pixels / 255.0 - 0.5) / 0.5).transpose(2, 0, 1)[None].astype(np.float32)
+              correct += int(session.run(None, {name: batch})[0].argmax() == label)
+          print(f"independent single, batch 1: {correct}/10000")
           PY
 
       - name: Evaluate through app code and rewrite results
