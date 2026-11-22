@@ -1,0 +1,101 @@
+name: Verify General mode
+
+# Rebuild the General mode label embeddings with scripts/build_general_embeddings.py,
+# compare them with the committed pack, and score committed and rebuilt packs on the
+# CIFAR-100 benchmark in scripts/eval_general.py. The pack built with the script's
+# default templates replaces the committed one when it scores at least as well on
+# every metric, so the file in git can be regenerated from code. Runs on branches
+# other than main.
+on:
+  workflow_dispatch:
+  push:
+    branches-ignore:
+      - main
+    paths:
+      - .github/workflows/verify-general.yml
+      - scripts/build_general_embeddings.py
+      - scripts/eval_general.py
+      - general_labels.py
+      - general.py
+
+permissions:
+  contents: write
+
+concurrency:
+  group: verify-general-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      GENERAL_MODEL_CACHE: ${{ github.workspace }}/.model-cache
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install onnxruntime==1.23.2 numpy==2.2.6 pillow==12.0.0 tokenizers
+
+      - name: Download CIFAR-100
+        run: |
+          mkdir -p data
+          curl -sSL -o data/cifar-100-python.tar.gz https://www.cs.toronto.edu/~kriz/cifar-100-python.tar.gz
+          echo "eb9058c3a382ffc7106e4002c42a8d85  data/cifar-100-python.tar.gz" | md5sum -c
+          tar xzf data/cifar-100-python.tar.gz -C data
+
+      - name: Rebuild embeddings
+        run: |
+          mkdir -p rebuilt
+          python scripts/build_general_embeddings.py --templates single --output rebuilt/single.npz
+          python scripts/build_general_embeddings.py --templates ensemble --output rebuilt/ensemble.npz
+
+      - name: Compare with committed pack
+        run: |
+          python - <<'PY'
+          import numpy as np
+          committed = np.load("data/general_label_embeddings.npz")
+          for name in ("single", "ensemble"):
+              other = np.load(f"rebuilt/{name}.npz")
+              same_layout = np.array_equal(committed["label_index"], other["label_index"])
+              cos = (committed["embeddings"] * other["embeddings"]).sum(1)
+              print(f"{name}: same layout {same_layout}, row cosine min {cos.min():.4f} "
+                    f"mean {cos.mean():.4f}, max abs diff {np.abs(committed['embeddings'] - other['embeddings']).max():.2e}")
+          PY
+
+      - name: Score committed and rebuilt packs
+        run: |
+          set -o pipefail
+          python scripts/eval_general.py | tee committed.txt
+          python scripts/eval_general.py --embeddings rebuilt/single.npz | tee single.txt
+          python scripts/eval_general.py --embeddings rebuilt/ensemble.npz | tee ensemble.txt
+
+      - name: Keep the reproducible pack if it is not worse
+        if: github.ref != 'refs/heads/main'
+        run: |
+          python - <<'PY'
+          import re, shutil
+          def scores(path):
+              text = open(path).read()
+              return tuple(int(re.search(rf"{key}\s*: (\d+)/", text).group(1))
+                           for key in ("256-way Top-1", "256-way Top-5", "51-way Top-1"))
+          old = scores("committed.txt")
+          print("committed", old, "single", scores("single.txt"), "ensemble", scores("ensemble.txt"))
+          new = scores("single.txt")
+          if all(n >= o for n, o in zip(new, old)):
+              shutil.copyfile("rebuilt/single.npz", "data/general_label_embeddings.npz")
+              print("using the pack built with the default (single) templates")
+          PY
+          python scripts/eval_general.py --write-results
+          if ! git diff --quiet -- data/general_label_embeddings.npz results/general_metrics.json; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add data/general_label_embeddings.npz results/general_metrics.json
+            git commit -m "Use reproducible General mode embeddings (run ${{ github.run_id }})"
+            git pull --rebase
+            git push
+          fi
