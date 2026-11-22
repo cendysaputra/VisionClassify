@@ -2,13 +2,13 @@
 
 # Image Classification App
 
-Lightweight Streamlit and ONNX Runtime web app achieving **98.42%** CIFAR 10 test accuracy plus **256** general object labels.
+Lightweight Streamlit and ONNX Runtime web app achieving **98.42%** CIFAR 10 test accuracy and **82.94%** Top 5 accuracy across **256** general object labels.
 
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.59-FF4B4B)
 ![ONNX Runtime](https://img.shields.io/badge/Runtime-ONNX%20INT8-005CED)
-![Test Accuracy](https://img.shields.io/badge/Accuracy-98.42%25-2EA043)
-![Model Size](https://img.shields.io/badge/Model-22.4%20MB-6F42C1)
+![CIFAR 10](https://img.shields.io/badge/CIFAR%2010-98.42%25-2EA043)
+![General Top 5](https://img.shields.io/badge/General%20Top%205-82.94%25-0969DA)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
 </div>
@@ -23,12 +23,12 @@ Lightweight Streamlit and ONNX Runtime web app achieving **98.42%** CIFAR 10 tes
     </td>
     <td align="center" width="50%">
       <img src="results/screenshot_umum.png" alt="General Mode" width="100%" /><br />
-      <sub><b>General Mode</b>: CLIP ViT B/32 ONNX (256 labels)</sub>
+      <sub><b>General Mode</b>: CLIP ViT B/16 ONNX (256 labels)</sub>
     </td>
   </tr>
 </table>
 
-## Performance
+## CIFAR 10 Mode Performance
 
 ![Model Accuracy and Size Overview](results/accuracy_overview.png)
 
@@ -64,13 +64,50 @@ Lightweight Streamlit and ONNX Runtime web app achieving **98.42%** CIFAR 10 tes
   </tbody>
 </table>
 
-## Confusion Matrix
-
 ![CIFAR 10 Confusion Matrix](results/confusion_matrix_tta.png)
 
 * Metrics: [`results/metrics.json`](results/metrics.json)
 * Checksum: [`results/model_sha256.txt`](results/model_sha256.txt)
 * Verify: `python scripts/eval_cifar_test.py`
+
+## General Mode Performance
+
+![General Mode Benchmark Overview](results/general_overview.png)
+
+<table>
+  <thead>
+    <tr>
+      <th align="left">Metric (1,530 Test Images, 51 Everyday Classes)</th>
+      <th align="center">CLIP ViT B/32</th>
+      <th align="center">CLIP ViT B/16 + Prompt Ensemble</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>256 Label Top 1</td>
+      <td align="center">55.03%</td>
+      <td align="center"><b>59.87%</b></td>
+    </tr>
+    <tr>
+      <td>51 Class Top 1</td>
+      <td align="center">70.92%</td>
+      <td align="center"><b>72.22%</b></td>
+    </tr>
+    <tr>
+      <td>256 Label Top 5</td>
+      <td align="center">81.70%</td>
+      <td align="center"><b>82.94%</b></td>
+    </tr>
+    <tr>
+      <td>Vision Weights Size</td>
+      <td align="center">89.1 MB</td>
+      <td align="center"><b>87.5 MB</b></td>
+    </tr>
+  </tbody>
+</table>
+
+* Metrics: [`results/general_metrics.json`](results/general_metrics.json)
+* Verify: `python scripts/eval_general.py`
 
 ## Quickstart
 
