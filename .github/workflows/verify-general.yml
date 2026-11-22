@@ -17,6 +17,7 @@ on:
       - scripts/eval_general.py
       - general_labels.py
       - general.py
+      - .gitignore
 
 permissions:
   contents: write

@@ -10,4 +10,6 @@ venv/
 *.onnx
 !model_vit_cifar10.onnx
 *.part
-data/
+# Downloaded datasets; the label embedding pack is part of the app.
+data/*
+!data/general_label_embeddings.npz
