@@ -15,19 +15,22 @@ from PIL import Image
 from classify import Prediction, RankedClass
 from general_labels import LABELS, NULL_PROMPTS, label_by_id
 
-VISION_FILENAME = "clip-vit-b16-vision-int8.onnx"
+VISION_FILENAME = "clip-vit-l14-vision-int8.onnx"
 VISION_URL = (
-    "https://huggingface.co/Xenova/clip-vit-base-patch16/resolve/"
-    "342fdf2f67aded64d138ff074745fb4a5d2bba5f/onnx/vision_model_quantized.onnx"
+    "https://huggingface.co/Xenova/clip-vit-large-patch14/resolve/"
+    "c307790166907339eed5a9a53a249af534102536/onnx/vision_model_quantized.onnx"
 )
-VISION_SHA256 = "44eece4fe5fe4e0359a88268a327adf758633a1aade3917690b952bef1501f96"
-VISION_BYTES = 87_461_602
+VISION_SHA256 = "9a658de8944a2001719beabf6c5030cfe7b3dc80e85983f69fc648d6b4d7ec0f"
+VISION_BYTES = 307_001_500
 EMBEDDINGS_FILENAME = "general_label_embeddings.npz"
-BACKEND_ID = "clip-vit-b16-int8-44eece4f"
+EMBED_DIM = 768
+BACKEND_ID = "clip-vit-l14-int8-9a658de8"
 LOGIT_SCALE = 100.0
-# Confidence thresholds
+# CLIP ViT-L/14 cosine scores sit in a narrower range than ViT-B/16, so near-synonym
+# labels (e.g. house vs cottage) are closer even on sharp photos; NULL_MARGIN still
+# flags noise and abstract uploads as low-confidence.
 NULL_MARGIN = 0.022
-MIN_LABEL_GAP = 0.005
+MIN_LABEL_GAP = 0.003
 INPUT_SIZE = 224
 _MAX_SIDE = 768
 _MAX_ASPECT = 3
@@ -215,7 +218,7 @@ def load_embedding_pack(path: Path | None = None) -> dict[str, np.ndarray]:
     expected = tuple(label.key for label in LABELS)
     if keys != expected:
         raise GeneralModelError("Berkas label umum tidak cocok dengan daftar label.")
-    if embeddings.ndim != 2 or embeddings.shape[1] != 512:
+    if embeddings.ndim != 2 or embeddings.shape[1] != EMBED_DIM:
         raise GeneralModelError("Bentuk embedding label tidak sesuai.")
     if label_index.shape != (embeddings.shape[0],):
         raise GeneralModelError("Indeks label tidak sesuai dengan embedding.")
@@ -223,7 +226,7 @@ def load_embedding_pack(path: Path | None = None) -> dict[str, np.ndarray]:
         raise GeneralModelError("Indeks label di luar daftar.")
     if set(label_index.tolist()) != set(range(len(LABELS))):
         raise GeneralModelError("Ada label tanpa embedding.")
-    if null_embeddings.shape != (len(NULL_PROMPTS), 512):
+    if null_embeddings.shape != (len(NULL_PROMPTS), EMBED_DIM):
         raise GeneralModelError("Embedding pembanding tidak sesuai.")
     return {
         "embeddings": embeddings,

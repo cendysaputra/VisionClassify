@@ -39,7 +39,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install onnxruntime==1.23.2 numpy==2.2.6 pillow==12.0.0 tokenizers
+        run: pip install onnxruntime==1.23.2 numpy==2.2.6 pillow==12.0.0 tokenizers pytest==9.2.0
 
       - name: Download CIFAR-100
         run: |
@@ -51,6 +51,7 @@ jobs:
       - name: Rebuild embeddings
         run: |
           mkdir -p rebuilt
+          cp data/general_label_embeddings.npz rebuilt/previous.npz
           python scripts/build_general_embeddings.py --templates single --output rebuilt/single.npz
           python scripts/build_general_embeddings.py --templates ensemble --output rebuilt/ensemble.npz
 
@@ -58,47 +59,39 @@ jobs:
         run: |
           python - <<'PY'
           import numpy as np
-          committed = np.load("data/general_label_embeddings.npz")
+          committed = np.load("rebuilt/previous.npz")
           for name in ("single", "ensemble"):
               other = np.load(f"rebuilt/{name}.npz")
               same_layout = np.array_equal(committed["label_index"], other["label_index"])
-              cos = (committed["embeddings"] * other["embeddings"]).sum(1)
-              print(f"{name}: same layout {same_layout}, row cosine min {cos.min():.4f} "
-                    f"mean {cos.mean():.4f}, max abs diff {np.abs(committed['embeddings'] - other['embeddings']).max():.2e}")
+              same_shape = committed["embeddings"].shape == other["embeddings"].shape
+              if same_shape:
+                  cos = (committed["embeddings"] * other["embeddings"]).sum(1)
+                  print(
+                      f"{name}: same layout {same_layout}, row cosine min {cos.min():.4f} "
+                      f"mean {cos.mean():.4f}, max abs diff {np.abs(committed['embeddings'] - other['embeddings']).max():.2e}"
+                  )
+              else:
+                  print(
+                      f"{name}: embedding shape changed from {committed['embeddings'].shape} "
+                      f"to {other['embeddings'].shape}"
+                  )
           PY
-
-      - name: Score committed and rebuilt packs
-        run: |
-          set -o pipefail
-          python scripts/eval_general.py | tee committed.txt
-          python scripts/eval_general.py --embeddings rebuilt/single.npz | tee single.txt
-          python scripts/eval_general.py --embeddings rebuilt/ensemble.npz | tee ensemble.txt
 
       - name: Commit the pack built from code
         if: github.ref != 'refs/heads/main'
         run: |
           # The committed pack must be the one the script builds (AGENTS.md rule 12).
-          # The comparison is recorded, not used as a gate: two runs on different
-          # runner CPUs moved the INT8 scores by up to 14 images, so "not worse on
-          # every metric" flipped between runs.
-          python - <<'PY'
-          import json, re
-          def scores(path):
-              text = open(path).read()
-              keys = {"top1_256": "256-way Top-1", "top5_256": "256-way Top-5", "top1_51": "51-way Top-1"}
-              return {k: int(re.search(rf"{v}\s*: (\d+)/", text).group(1)) for k, v in keys.items()}
-          comparison = {
-              "images": 1530,
-              "batch_size": 1,
-              "previous_committed_pack": scores("committed.txt"),
-              "built_single_templates": scores("single.txt"),
-              "built_ensemble_templates": scores("ensemble.txt"),
-          }
-          json.dump(comparison, open("results/general_comparison.json", "w"), indent=2)
-          print(json.dumps(comparison, indent=2))
-          PY
+          # Copy it into place first, then run a single batch-1 vision pass that scores
+          # the previous pack (when compatible), single-template and ensemble packs, and
+          # writes both results/general_metrics.json and results/general_comparison.json.
           cp rebuilt/single.npz data/general_label_embeddings.npz
-          python scripts/eval_general.py --write-results
+          python scripts/eval_general.py --write-results \
+            --compare \
+              previous_committed_pack=rebuilt/previous.npz \
+              built_single_templates=rebuilt/single.npz \
+              built_ensemble_templates=rebuilt/ensemble.npz \
+            --comparison-out results/general_comparison.json
+          GENERAL_LIVE=1 pytest tests/test_general_live.py
           if ! git diff --quiet -- data/general_label_embeddings.npz results/; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
