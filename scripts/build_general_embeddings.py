@@ -36,14 +36,16 @@ from general_labels import LABELS, NULL_PROMPTS, GeneralLabel, prompt_texts  # n
 
 # Same repository and revision as general.VISION_URL.
 _REVISION_URL = (
-    "https://huggingface.co/Xenova/clip-vit-base-patch16/resolve/"
-    "342fdf2f67aded64d138ff074745fb4a5d2bba5f/"
+    "https://huggingface.co/Xenova/clip-vit-large-patch14/resolve/"
+    "c307790166907339eed5a9a53a249af534102536/"
 )
 TEXT_URL = _REVISION_URL + "onnx/text_model_quantized.onnx"
+TEXT_SHA256 = "6d31c7a212681c3918d78193b6b4f98c70fe540577f9a0a57fe7ba8c7439244c"
 TOKENIZER_URL = _REVISION_URL + "tokenizer.json"
+TOKENIZER_SHA256 = "72ed5c96db5729294468543e4bc75fce14ca63f58e37300290189ba1c1e52b85"
 CONTEXT_LENGTH = 77
 PAD_ID = 49407
-EMBED_DIM = 512
+EMBED_DIM = 768
 OUTPUT = ROOT / "data" / "general_label_embeddings.npz"
 
 # Templates for labels without hand-written prompts. {a} is "a" or "an".
@@ -66,25 +68,30 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _cache_file(env_name: str, url: str, filename: str) -> Path:
-    """Download once into the cache. The URL pins a revision, so content is fixed."""
+def _cache_file(env_name: str, url: str, filename: str, expected_sha256: str | None = None) -> Path:
+    """Download once into the cache and verify SHA-256 against the pinned revision."""
     override = os.environ.get(env_name)
     if override:
         return Path(override)
     cache = Path(os.environ.get("GENERAL_MODEL_CACHE", Path.home() / ".cache" / "VisionClassify"))
     path = cache / filename
-    if path.is_file():
+    if path.is_file() and (expected_sha256 is None or _sha256(path) == expected_sha256):
         return path
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".part")
     request = urllib.request.Request(url, headers={"User-Agent": "VisionClassify/1.0"})
-    with urllib.request.urlopen(request, timeout=120) as response, temporary.open("wb") as handle:
-        while True:
-            chunk = response.read(1024 * 1024)
-            if not chunk:
-                break
-            handle.write(chunk)
-    temporary.replace(path)
+    try:
+        with urllib.request.urlopen(request, timeout=180) as response, temporary.open("wb") as handle:
+            while True:
+                chunk = response.read(1024 * 1024)
+                if not chunk:
+                    break
+                handle.write(chunk)
+        if expected_sha256 is not None and _sha256(temporary) != expected_sha256:
+            raise SystemExit(f"SHA-256 mismatch for {filename}")
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
     return path
 
 
@@ -136,8 +143,12 @@ def main() -> None:
     import onnxruntime as ort
     from tokenizers import Tokenizer
 
-    text_path = _cache_file("CLIP_TEXT_ONNX", TEXT_URL, "clip-vit-b16-text-int8.onnx")
-    tokenizer_path = _cache_file("CLIP_TOKENIZER", TOKENIZER_URL, "clip-vit-b16-tokenizer.json")
+    text_path = _cache_file(
+        "CLIP_TEXT_ONNX", TEXT_URL, "clip-vit-l14-text-int8.onnx", TEXT_SHA256
+    )
+    tokenizer_path = _cache_file(
+        "CLIP_TOKENIZER", TOKENIZER_URL, "clip-vit-l14-tokenizer.json", TOKENIZER_SHA256
+    )
     print(f"text model sha256: {_sha256(text_path)}")
     print(f"tokenizer sha256: {_sha256(tokenizer_path)}")
 

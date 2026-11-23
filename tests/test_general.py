@@ -77,8 +77,8 @@ def test_preprocess_limits_extreme_aspect_ratio():
 def test_saved_pack_matches_the_label_list():
     pack = load_embedding_pack()
     expected_rows = sum(len(prompt_texts(item)) for item in LABELS)
-    assert pack["embeddings"].shape == (expected_rows, 512)
-    assert pack["null_embeddings"].shape == (len(NULL_PROMPTS), 512)
+    assert pack["embeddings"].shape == (expected_rows, general.EMBED_DIM)
+    assert pack["null_embeddings"].shape == (len(NULL_PROMPTS), general.EMBED_DIM)
     assert set(np.unique(pack["label_index"])).issuperset(set(range(len(LABELS))))
 
 
@@ -147,9 +147,9 @@ def test_pack_rejects_mismatched_keys(tmp_path, monkeypatch):
     path = tmp_path / "bad.npz"
     np.savez(
         path,
-        embeddings=np.zeros((1, 512), dtype=np.float32),
+        embeddings=np.zeros((1, general.EMBED_DIM), dtype=np.float32),
         label_index=np.zeros(1, dtype=np.int32),
-        null_embeddings=np.zeros((len(NULL_PROMPTS), 512), dtype=np.float32),
+        null_embeddings=np.zeros((len(NULL_PROMPTS), general.EMBED_DIM), dtype=np.float32),
         keys=np.asarray(["bukan-label"]),
     )
     monkeypatch.setattr(general, "embeddings_path", lambda: path)
