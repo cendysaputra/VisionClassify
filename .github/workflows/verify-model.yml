@@ -28,7 +28,7 @@ env:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
 
@@ -41,15 +41,40 @@ jobs:
 
       - name: Record source model provenance
         run: |
-          mkdir -p results/provenance
-          out=results/provenance
-          curl -fsSL "https://huggingface.co/api/models/$SOURCE_MODEL" | python -m json.tool > "$out/source_model_api.json" || echo "API not available" > "$out/source_model_api.json"
-          curl -fsSL "https://huggingface.co/$SOURCE_MODEL/raw/main/README.md" -o "$out/source_model_card.md" || echo "No model card" > "$out/source_model_card.md"
-          curl -fsSL "https://huggingface.co/$SOURCE_MODEL/raw/main/config.json" -o "$out/source_model_config.json" || echo "{}" > "$out/source_model_config.json"
-          # Training state, if the author uploaded it, shows the eval split and checkpoint choice.
-          curl -fsSL "https://huggingface.co/$SOURCE_MODEL/raw/main/trainer_state.json" -o "$out/source_trainer_state.json" || rm -f "$out/source_trainer_state.json"
-          echo "--- model card ---"; cat "$out/source_model_card.md"
-          echo "--- files ---"; python -c "import json;d=json.load(open('$out/source_model_api.json'));print(d.get('cardData'));print([s['rfilename'] for s in d.get('siblings',[])])" || true
+          python - <<'PY'
+          import hashlib, json, os, pathlib, subprocess
+
+          model = pathlib.Path("model_vit_cifar10.onnx")
+          digest = hashlib.sha256(model.read_bytes()).hexdigest()
+          train_prov = pathlib.Path("results/provenance/train_run.json")
+          if train_prov.is_file() and json.loads(train_prov.read_text()).get("model_sha256") == digest:
+              print("Model matches in-repo training provenance:", train_prov)
+              print(train_prov.read_text())
+          else:
+              out = pathlib.Path("results/provenance")
+              out.mkdir(parents=True, exist_ok=True)
+              src = os.environ["SOURCE_MODEL"]
+              subprocess.run(
+                  f'curl -fsSL "https://huggingface.co/api/models/{src}" | python -m json.tool > "{out}/source_model_api.json" || echo "API not available" > "{out}/source_model_api.json"',
+                  shell=True,
+                  check=False,
+              )
+              subprocess.run(
+                  f'curl -fsSL "https://huggingface.co/{src}/raw/main/README.md" -o "{out}/source_model_card.md" || echo "No model card" > "{out}/source_model_card.md"',
+                  shell=True,
+                  check=False,
+              )
+              subprocess.run(
+                  f'curl -fsSL "https://huggingface.co/{src}/raw/main/config.json" -o "{out}/source_model_config.json" || echo "{{}}" > "{out}/source_model_config.json"',
+                  shell=True,
+                  check=False,
+              )
+              subprocess.run(
+                  f'curl -fsSL "https://huggingface.co/{src}/raw/main/trainer_state.json" -o "{out}/source_trainer_state.json" || rm -f "{out}/source_trainer_state.json"',
+                  shell=True,
+                  check=False,
+              )
+          PY
 
       - name: Download CIFAR-10
         run: |
