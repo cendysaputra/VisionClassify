@@ -1,0 +1,38 @@
+{
+  "created_at_utc": "2026-11-23T06:52:53.905966+00:00",
+  "script": "scripts/train_cifar10_dinov2.py",
+  "model_file": "model_vit_cifar10.onnx",
+  "model_architecture": "DINOv2-Reg ViT-B/14 + Trained Head (W8 ONNX)",
+  "model_sha256": "a8294d79277e151aecb3305b2596cb32b9517494df043fb1833480f6e1a54946",
+  "model_bytes": 98928719,
+  "base_model": "facebook/dinov2-with-registers-base",
+  "base_model_revision": "a1d738ccfa7ae170945f210395d99dde8adb1805",
+  "base_model_license": "apache-2.0",
+  "pretraining_data": "LVD-142M (self-supervised, no CIFAR-10 labels)",
+  "dataset": "CIFAR-10",
+  "train_images": 45000,
+  "train_views": 90000,
+  "val_images": 5000,
+  "test_set_used_for_training": false,
+  "test_set_used_for_selection": false,
+  "selected_head": "mlp512_wd5e-2",
+  "best_val_accuracy": 0.988,
+  "val_candidates": {
+    "linear_wd1e-2": 0.9844,
+    "linear_wd5e-2": 0.985,
+    "linear_wd2e-1": 0.9852,
+    "mlp512_wd5e-2": 0.988,
+    "mlp512_wd2e-1": 0.9876
+  },
+  "onnx_val200_accuracy": 0.985,
+  "onnx_val200_agreement": 1.0,
+  "hyperparameters": {
+    "seed": 42,
+    "input_size": 224,
+    "feature_dim": 3840,
+    "flip_augmentation": true,
+    "quantization": "weight_only_int8_block128_symmetric"
+  },
+  "github_run_id": "45121789922",
+  "github_run_url": "https://github.com/cendysaputra/VisionClassify/actions/runs/45121789922"
+}
