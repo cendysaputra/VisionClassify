@@ -180,21 +180,41 @@ def main() -> None:
 
     results = ROOT / "results"
     results.mkdir(parents=True, exist_ok=True)
+    train_prov_path = results / "provenance" / "train_run.json"
+    train_prov = None
+    if train_prov_path.is_file():
+        candidate = json.loads(train_prov_path.read_text(encoding="utf-8"))
+        if candidate.get("model_sha256") == digest:
+            train_prov = candidate
+
+    if train_prov is not None:
+        model_architecture = str(train_prov.get("model_architecture", "ViT (ONNX)"))
+        source_model = f"{train_prov['script']} (base: {train_prov['base_model']})"
+        test_for_training = train_prov.get("test_set_used_for_training")
+        test_for_selection = train_prov.get("test_set_used_for_selection")
+        provenance_ref = "results/provenance/train_run.json"
+    else:
+        model_architecture = "ViT-Small/16 (INT8 ONNX)"
+        source_model = "MF21377197/vit-small-patch16-224-finetuned-Cifar10"
+        # Third-party weights: whether the test split was used during their
+        # fine-tune is not known from this repo. See results/provenance/.
+        test_for_training = None
+        test_for_selection = None
+        provenance_ref = "results/provenance/"
+
     payload = {
         "dataset": "CIFAR-10",
         "test_images": 10000,
         "model_file": path.name,
-        "model_architecture": "ViT-Small/16 (INT8 ONNX)",
-        "source_model": "MF21377197/vit-small-patch16-224-finetuned-Cifar10",
+        "model_architecture": model_architecture,
+        "source_model": source_model,
         "model_sha256": digest,
         "model_bytes": path.stat().st_size,
         "app_inference": app_policy,
         "app_views": len(TTA_POLICIES[app_policy]),
-        # Third-party weights: whether the test split was used during their
-        # fine-tune is not known from this repo. See results/provenance/.
-        "test_set_used_for_training": None,
-        "test_set_used_for_selection": None,
-        "provenance": "results/provenance/",
+        "test_set_used_for_training": test_for_training,
+        "test_set_used_for_selection": test_for_selection,
+        "provenance": provenance_ref,
         "batch_size": args.batch_size,
         "test_correct": correct,
         "test_accuracy": {policy: count / 10000 for policy, count in correct.items()},

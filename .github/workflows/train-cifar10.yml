@@ -1,0 +1,151 @@
+name: Train CIFAR-10 model
+
+# Reproducibly train an in-repo CIFAR-10 model from pinned facebook/dinov2-with-registers-base
+# (Apache-2.0) across 20 parallel CPU shards using ONLY data_batch_1..5 (45k train / 5k val).
+# test_batch is never read by this workflow; after it commits model_vit_cifar10.onnx and
+# results/provenance/train_run.json to the branch, run Verify model accuracy to measure
+# official 10,000-image test accuracy once.
+on:
+  workflow_dispatch:
+    inputs:
+      include_flip:
+        description: "Include horizontally flipped training views (90k train views)"
+        type: boolean
+        default: true
+      quant_bits:
+        description: "Weight-only quantization bits (8 or 4)"
+        type: string
+        default: "8"
+      quant_block_size:
+        description: "Weight-only quantization block size (128 for W8, 32 for W4)"
+        type: string
+        default: "128"
+  push:
+    branches-ignore:
+      - main
+    paths:
+      - .github/workflows/train-cifar10.yml
+      - scripts/train_cifar10_dinov2.py
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: train-cifar10-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  extract:
+    if: github.ref != 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: true
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install extraction dependencies
+        run: |
+          pip install --index-url https://download.pytorch.org/whl/cpu torch
+          pip install transformers onnx onnxruntime==1.23.2 numpy==2.2.6 pillow==12.0.0
+
+      - name: Download CIFAR-10
+        run: |
+          mkdir -p data
+          curl -sSL -o data/cifar-10-python.tar.gz https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz
+          echo "c58f30108f718f92721af3b95e74349a  data/cifar-10-python.tar.gz" | md5sum -c
+          tar xzf data/cifar-10-python.tar.gz -C data
+
+      - name: Extract shard features
+        run: |
+          mkdir -p shards
+          FLIP_FLAG=""
+          if [ "${{ inputs.include_flip }}" != "false" ]; then
+            FLIP_FLAG="--include-flip"
+          fi
+          python scripts/train_cifar10_dinov2.py extract \
+            --data-dir data \
+            --shard-index ${{ matrix.shard }} \
+            --num-shards 20 \
+            --quant-bits ${{ inputs.quant_bits || '8' }} \
+            --quant-block-size ${{ inputs.quant_block_size || '128' }} \
+            $FLIP_FLAG \
+            --output shards/shard_${{ matrix.shard }}.npz
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cifar10-dinov2-shard-${{ matrix.shard }}
+          path: shards/shard_${{ matrix.shard }}.npz
+          retention-days: 1
+
+  train:
+    if: github.ref != 'refs/heads/main'
+    needs: extract
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install training and test dependencies
+        run: |
+          pip install --index-url https://download.pytorch.org/whl/cpu torch
+          pip install transformers onnx scikit-learn
+          pip install -r requirements-dev.txt
+
+      - name: Download CIFAR-10
+        run: |
+          mkdir -p data
+          curl -sSL -o data/cifar-10-python.tar.gz https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz
+          echo "c58f30108f718f92721af3b95e74349a  data/cifar-10-python.tar.gz" | md5sum -c
+          tar xzf data/cifar-10-python.tar.gz -C data
+
+      - name: Download feature shards
+        uses: actions/download-artifact@v4
+        with:
+          pattern: cifar10-dinov2-shard-*
+          path: shards
+          merge-multiple: true
+
+      - name: Train classifier head and export ONNX
+        run: |
+          python scripts/train_cifar10_dinov2.py train \
+            --data-dir data \
+            --shards-dir shards \
+            --quant-bits ${{ inputs.quant_bits || '8' }} \
+            --quant-block-size ${{ inputs.quant_block_size || '128' }} \
+            --output model_vit_cifar10.onnx \
+            --provenance-out results/provenance/train_run.json
+
+      - name: Run pytest with newly trained model
+        run: pytest
+
+      - name: Commit trained model and provenance
+        if: github.ref != 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add model_vit_cifar10.onnx results/provenance/train_run.json
+          if git diff --cached --quiet; then
+            echo "No model changes to commit"
+          else
+            git commit -m "Train CIFAR-10 DINOv2-Reg model from repository code (run ${{ github.run_id }})"
+            git pull --rebase
+            git push
+          fi
+
+      - name: Trigger Verify model accuracy on trained model
+        if: github.ref != 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run verify-model.yml --ref "${GITHUB_REF_NAME}"
