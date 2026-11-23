@@ -72,14 +72,68 @@ def load_overlapping_test(root: Path, per_class: int) -> tuple[np.ndarray, np.nd
     return np.asarray(images), np.asarray(targets, dtype=np.int64), sorted(mapping.values())
 
 
+def _score_pack(
+    image_embeds: np.ndarray,
+    targets: np.ndarray,
+    subset_mask: np.ndarray,
+    prompts: np.ndarray,
+    label_index: np.ndarray,
+) -> dict[str, object]:
+    """Score one embedding pack against precomputed unit image embeddings."""
+    top1_256 = 0
+    top5_256 = 0
+    top1_subset = 0
+    cat_total: dict[str, int] = {}
+    cat_top1: dict[str, int] = {}
+    cat_top5: dict[str, int] = {}
+    for emb, target in zip(image_embeds, targets):
+        t = int(target)
+        sims = prompts @ emb
+        scores = np.full(len(LABELS), -np.inf, dtype=np.float32)
+        np.maximum.at(scores, label_index, sims)
+        order = np.argsort(-scores)
+        cat = CATEGORY_EN[LABELS[t].category]
+        cat_total[cat] = cat_total.get(cat, 0) + 1
+        if int(order[0]) == t:
+            top1_256 += 1
+            cat_top1[cat] = cat_top1.get(cat, 0) + 1
+        if t in order[:5]:
+            top5_256 += 1
+            cat_top5[cat] = cat_top5.get(cat, 0) + 1
+        if int(np.argmax(np.where(subset_mask, scores, -np.inf))) == t:
+            top1_subset += 1
+    return {
+        "top1_256": top1_256,
+        "top5_256": top5_256,
+        "top1_51": top1_subset,
+        "per_category_top1": {k: round(cat_top1.get(k, 0) / v, 4) for k, v in sorted(cat_total.items())},
+        "per_category_top5": {k: round(cat_top5.get(k, 0) / v, 4) for k, v in sorted(cat_total.items())},
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-dir", default=str(ROOT / "data"))
     parser.add_argument("--per-class", type=int, default=30)
     # Batch size 1 like the app: the INT8 vision model quantizes per batch.
     parser.add_argument("--batch-size", type=int, default=1)
-    parser.add_argument("--embeddings", default=None,
-                        help="Score another label embedding pack instead of the committed one.")
+    parser.add_argument(
+        "--embeddings",
+        default=None,
+        help="Score another label embedding pack instead of the committed one.",
+    )
+    parser.add_argument(
+        "--compare",
+        nargs="+",
+        default=None,
+        metavar="NAME=PATH",
+        help="Additional label packs to score on the same freshly computed batch-1 image embeddings.",
+    )
+    parser.add_argument(
+        "--comparison-out",
+        default=None,
+        help="Write comparison JSON for --compare packs.",
+    )
     parser.add_argument("--write-results", action="store_true")
     args = parser.parse_args()
     if args.embeddings and args.write_results:
@@ -95,52 +149,68 @@ def main() -> None:
     else:
         prompts = general._unit_rows(backend.prompt_embeds)
         label_index = backend.prompt_labels
+
+    compare_packs: list[tuple[str, np.ndarray, np.ndarray]] = []
+    if args.compare:
+        for spec in args.compare:
+            if "=" not in spec:
+                parser.error(f"--compare entry must be NAME=PATH, got {spec!r}")
+            name, raw_path = spec.split("=", 1)
+            other = general.load_embedding_pack(Path(raw_path))
+            compare_packs.append(
+                (name, general._unit_rows(other["embeddings"]), other["label_index"])
+            )
+
     subset_mask = np.zeros(len(LABELS), dtype=bool)
     subset_mask[subset_indices] = True
 
-    top1_256 = 0
-    top5_256 = 0
-    top1_subset = 0
-    cat_total: dict[str, int] = {}
-    cat_top1: dict[str, int] = {}
-    cat_top5: dict[str, int] = {}
-
     total = len(images)
+    # Compute image embeddings once at batch_size=1 so comparing multiple prompt packs
+    # does not multiply ONNX vision passes in CI while preserving exact app inference.
+    embed_chunks: list[np.ndarray] = []
     for start in range(0, total, args.batch_size):
         chunk = images[start : start + args.batch_size]
         batch = np.concatenate(
             [general.preprocess_general(Image.fromarray(img)) for img in chunk],
             axis=0,
         )
-        # Run ONNX batch
         embs = general._unit_rows(
             backend._session.run(["image_embeds"], {backend._input_name: batch})[0]
         )
-        for emb, target in zip(embs, targets[start : start + args.batch_size]):
-            t = int(target)
-            sims = prompts @ emb
-            scores = np.full(len(LABELS), -np.inf, dtype=np.float32)
-            np.maximum.at(scores, label_index, sims)
-            order = np.argsort(-scores)
-            cat = CATEGORY_EN[LABELS[t].category]
-            cat_total[cat] = cat_total.get(cat, 0) + 1
-            if int(order[0]) == t:
-                top1_256 += 1
-                cat_top1[cat] = cat_top1.get(cat, 0) + 1
-            if t in order[:5]:
-                top5_256 += 1
-                cat_top5[cat] = cat_top5.get(cat, 0) + 1
-            if int(np.argmax(np.where(subset_mask, scores, -np.inf))) == t:
-                top1_subset += 1
+        embed_chunks.append(embs)
         done = min(start + args.batch_size, total)
         if done % 320 < args.batch_size or done == total:
             print(f"[general] {done}/{total}", flush=True)
 
-    per_category_top1 = {k: round(cat_top1.get(k, 0) / v, 4) for k, v in sorted(cat_total.items())}
-    per_category_top5 = {k: round(cat_top5.get(k, 0) / v, 4) for k, v in sorted(cat_total.items())}
+    image_embeds = np.concatenate(embed_chunks, axis=0)
+    primary = _score_pack(image_embeds, targets, subset_mask, prompts, label_index)
+    top1_subset = int(primary["top1_51"])
+    top1_256 = int(primary["top1_256"])
+    top5_256 = int(primary["top5_256"])
+
     print(f"51-way Top-1 : {top1_subset}/{total} = {top1_subset/total:.4f}")
     print(f"256-way Top-1: {top1_256}/{total} = {top1_256/total:.4f}")
     print(f"256-way Top-5: {top5_256}/{total} = {top5_256/total:.4f}")
+
+    if compare_packs:
+        comparison: dict[str, object] = {"images": total, "batch_size": args.batch_size}
+        for name, other_prompts, other_index in compare_packs:
+            res = _score_pack(image_embeds, targets, subset_mask, other_prompts, other_index)
+            comparison[name] = {
+                "top1_256": int(res["top1_256"]),
+                "top5_256": int(res["top5_256"]),
+                "top1_51": int(res["top1_51"]),
+            }
+            print(
+                f"[{name}] 51-way Top-1: {res['top1_51']}/{total} | "
+                f"256-way Top-1: {res['top1_256']}/{total} | "
+                f"256-way Top-5: {res['top5_256']}/{total}"
+            )
+        if args.comparison_out:
+            comp_path = Path(args.comparison_out)
+            comp_path.parent.mkdir(parents=True, exist_ok=True)
+            comp_path.write_text(json.dumps(comparison, indent=2) + "\n", encoding="utf-8")
+            print(f"wrote {comp_path}")
 
     if not args.write_results:
         return
@@ -151,14 +221,23 @@ def main() -> None:
         "total_labels": len(LABELS),
         "images_evaluated": total,
         "batch_size": args.batch_size,
-        "model_architecture": "CLIP ViT-B/16 (INT8 ONNX) + Prompt Ensemble",
+        "model_architecture": "CLIP ViT-L/14 (INT8 ONNX)",
+        "source_model": "Xenova/clip-vit-large-patch14",
+        "provenance": "results/provenance/general_model.json",
         "model_sha256": general.VISION_SHA256,
         "model_bytes": general.VISION_BYTES,
         "subset_51_top1_accuracy": round(top1_subset / total, 4),
         "all_256_top1_accuracy": round(top1_256 / total, 4),
         "all_256_top5_accuracy": round(top5_256 / total, 4),
-        "per_category_256_top1": per_category_top1,
-        "per_category_256_top5": per_category_top5,
+        "per_category_256_top1": primary["per_category_top1"],
+        "per_category_256_top5": primary["per_category_top5"],
+        "baseline_vit_b16": {
+            "model_architecture": "CLIP ViT-B/16 (INT8 ONNX)",
+            "model_bytes": 87461602,
+            "subset_51_top1_accuracy": 0.7392,
+            "all_256_top1_accuracy": 0.617,
+            "all_256_top5_accuracy": 0.8399,
+        },
         "baseline_vit_b32": {
             "model_architecture": "CLIP ViT-B/32 (INT8 ONNX)",
             "model_bytes": 89117001,

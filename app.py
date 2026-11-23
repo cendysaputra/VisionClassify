@@ -255,7 +255,8 @@ else:
         if general.vision_weights_cached():
             spinner = "Memuat model umum..."
         else:
-            spinner = "Mengunduh model umum (sekitar 85 MB). Unduhan ini sekali per server."
+            size_mb = round(general.VISION_BYTES / 1_000_000)
+            spinner = f"Mengunduh model umum (sekitar {size_mb} MB). Unduhan ini sekali per server."
         with st.spinner(spinner):
             backend = get_general_backend()
     except general.GeneralModelError as exc:
