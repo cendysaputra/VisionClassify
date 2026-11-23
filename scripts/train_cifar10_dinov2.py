@@ -148,13 +148,21 @@ def _build_feature_module():
 
 def _quantize_weight_only(fp32_path: Path, output_path: Path, bits: int, block_size: int) -> None:
     """Apply weight-only block quantization so activations stay FP32 (zero batch drift)."""
-    from onnxruntime.quantization.matmul_nbits_quantizer import MatMulNBitsQuantizer
+    from onnxruntime.quantization.matmul_nbits_quantizer import (
+        DefaultWeightOnlyQuantConfig,
+        MatMulNBitsQuantizer,
+    )
 
-    quantizer = MatMulNBitsQuantizer(
-        model=str(fp32_path),
-        bits=bits,
+    algo_config = DefaultWeightOnlyQuantConfig(
         block_size=block_size,
         is_symmetric=True,
+        bits=bits,
+    )
+    quantizer = MatMulNBitsQuantizer(
+        model=str(fp32_path),
+        block_size=block_size,
+        is_symmetric=True,
+        algo_config=algo_config,
     )
     quantizer.process()
     quantizer.model.save_model_to_file(str(output_path))
