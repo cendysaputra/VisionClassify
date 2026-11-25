@@ -46,12 +46,42 @@ jobs:
         run: |
           mkdir -p data
           if [ ! -f data/cifar-10-python.tar.gz ]; then
-            # Abort a transfer slower than 50 kB/s for 60 s and retry, instead of hanging.
-            curl -sSL --retry 4 --retry-all-errors --connect-timeout 30 --speed-limit 50000 --speed-time 60 \
-              -o data/cifar-10-python.tar.gz https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz
+            curl -sSL --connect-timeout 30 --max-time 300 \
+              -o data/cifar-10-python.tar.gz https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz \
+              || rm -f data/cifar-10-python.tar.gz
           fi
-          echo "c58f30108f718f92721af3b95e74349a  data/cifar-10-python.tar.gz" | md5sum -c
-          tar xzf data/cifar-10-python.tar.gz -C data
+          if [ -f data/cifar-10-python.tar.gz ] \
+             && echo "c58f30108f718f92721af3b95e74349a  data/cifar-10-python.tar.gz" | md5sum -c; then
+            tar xzf data/cifar-10-python.tar.gz -C data
+          else
+            # cs.toronto.edu stalled for over 30 minutes in two runs. Fall back to the
+            # Hugging Face copy of the test split, pinned to the revision resolved now
+            # and printed, and rebuild test_batch in the original pickle layout.
+            rm -f data/cifar-10-python.tar.gz
+            pip install pyarrow==22.0.0
+            rev=$(curl -fsSL https://huggingface.co/api/datasets/uoft-cs/cifar10 | python -c "import json,sys;print(json.load(sys.stdin)['sha'])")
+            echo "uoft-cs/cifar10 revision $rev"
+            curl -fsSL -o data/cifar10-test.parquet \
+              "https://huggingface.co/datasets/uoft-cs/cifar10/resolve/$rev/plain_text/test-00000-of-00001.parquet"
+            sha256sum data/cifar10-test.parquet
+            python - <<'PY'
+          import io, os, pickle
+          import numpy as np
+          import pyarrow.parquet as pq
+          from PIL import Image
+          table = pq.read_table("data/cifar10-test.parquet").to_pydict()
+          images = np.stack([np.asarray(Image.open(io.BytesIO(i["bytes"])).convert("RGB")) for i in table["img"]])
+          labels = np.asarray(table["label"])
+          # Same size and class balance as the official test_batch.
+          assert images.shape == (10000, 32, 32, 3), images.shape
+          assert np.bincount(labels, minlength=10).tolist() == [1000] * 10
+          os.makedirs("data/cifar-10-batches-py", exist_ok=True)
+          with open("data/cifar-10-batches-py/test_batch", "wb") as f:
+              pickle.dump({b"data": images.transpose(0, 3, 1, 2).reshape(10000, -1),
+                           b"labels": labels.tolist()}, f)
+          print("rebuilt test_batch from Hugging Face; image 0 label", int(labels[0]))
+          PY
+          fi
 
       - name: Build GIF
         run: python scripts/make_process_gif.py --index 0 --out docs/process.gif
