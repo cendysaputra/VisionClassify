@@ -1,0 +1,60 @@
+name: Process GIF
+
+# Rebuild docs/process.gif (README figure) with scripts/make_process_gif.py from a real
+# CIFAR-10 test image and the committed model, and commit it to the branch, so the
+# figure always matches the model in the repository. Runs on branches other than main.
+on:
+  workflow_dispatch:
+  push:
+    branches-ignore:
+      - main
+    paths:
+      - .github/workflows/process-gif.yml
+      - scripts/make_process_gif.py
+      - classify.py
+      - model_vit_cifar10.onnx
+
+permissions:
+  contents: write
+
+concurrency:
+  group: process-gif-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gif:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install onnxruntime==1.23.2 numpy==2.2.6 pillow==12.0.0 matplotlib==3.11.2
+
+      - name: Download CIFAR-10
+        run: |
+          mkdir -p data
+          curl -sSL -o data/cifar-10-python.tar.gz https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz
+          echo "c58f30108f718f92721af3b95e74349a  data/cifar-10-python.tar.gz" | md5sum -c
+          tar xzf data/cifar-10-python.tar.gz -C data
+
+      - name: Build GIF
+        run: python scripts/make_process_gif.py --index 0 --out docs/process.gif
+
+      - name: Commit GIF
+        if: github.ref != 'refs/heads/main'
+        run: |
+          git add docs/process.gif
+          if git diff --cached --quiet; then
+            echo "docs/process.gif up to date"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "Rebuild process GIF from the committed model (run ${{ github.run_id }})"
+            git pull --rebase
+            git push
+          fi
