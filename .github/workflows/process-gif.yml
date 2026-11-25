@@ -35,10 +35,21 @@ jobs:
       - name: Install dependencies
         run: pip install onnxruntime==1.23.2 numpy==2.2.6 pillow==12.0.0 matplotlib==3.11.2
 
+      # The archive is fixed (md5 below), so cache it: cs.toronto.edu can stall for
+      # many minutes, and a stalled download held the first run of this workflow.
+      - uses: actions/cache@v4
+        with:
+          path: data/cifar-10-python.tar.gz
+          key: cifar-10-python-c58f30108f718f92721af3b95e74349a
+
       - name: Download CIFAR-10
         run: |
           mkdir -p data
-          curl -sSL -o data/cifar-10-python.tar.gz https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz
+          if [ ! -f data/cifar-10-python.tar.gz ]; then
+            # Abort a transfer slower than 50 kB/s for 60 s and retry, instead of hanging.
+            curl -sSL --retry 4 --retry-all-errors --connect-timeout 30 --speed-limit 50000 --speed-time 60 \
+              -o data/cifar-10-python.tar.gz https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz
+          fi
           echo "c58f30108f718f92721af3b95e74349a  data/cifar-10-python.tar.gz" | md5sum -c
           tar xzf data/cifar-10-python.tar.gz -C data
 
