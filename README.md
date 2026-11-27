@@ -11,8 +11,6 @@ Lightweight Streamlit and ONNX Runtime web app with **98.47%** CIFAR 10 test acc
 
 ![The CIFAR-10 process on a real test image: the 32×32 image is shown, resized to the 224×224 model input, a window map shows which parts of the image the model relies on, and the top-5 class bars grow](docs/process.gif)
 
-<sub>The first CIFAR-10 test image (`test_batch` index 0, chosen before looking at predictions) going through the committed model and the app's preprocessing. In the window map the model sees only one 56×56 window at a time, the rest grey; brighter cells give a higher probability for the top-1 class. Made with `scripts/make_process_gif.py` by the **Process GIF** workflow.</sub>
-
 ## Overview
 
 Upload any JPG, PNG, or WEBP photo to classify objects directly in your browser. Both inference modes run on a unified **ONNX Runtime** backend without TensorFlow for fast startup and low memory usage.
